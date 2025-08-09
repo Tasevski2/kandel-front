@@ -24,8 +24,6 @@ export function useChainValidation() {
     isCorrectChain,
     needsChainSwitch,
     switchToActiveNetwork,
-    // Legacy alias for backward compatibility
-    switchToAnvil: switchToActiveNetwork,
     isSwitching,
     requiredChain: activeNetwork,
     networkName: getNetworkName(),

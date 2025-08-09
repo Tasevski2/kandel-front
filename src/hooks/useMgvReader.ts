@@ -5,6 +5,7 @@ import { readerAbi } from '../abi/reader';
 import { erc20Abi } from '../abi/erc20';
 import { ADDRESSES } from '../lib/addresses';
 import { config } from './useChain';
+import { tickToPrice } from '@/lib/pricing';
 
 export interface Offer {
   id: bigint;
@@ -41,15 +42,6 @@ export function useMgvReader() {
       return 18;
     }
   }, []);
-
-  // Convert tick to price with proper decimal adjustment
-  const tickToPriceQperB = useCallback(
-    (tick: bigint, baseDec: number, quoteDec: number): number => {
-      const ratio = Math.exp(Number(tick) * Math.log(1.0001)); // 1.0001**tick
-      return ratio;
-    },
-    []
-  );
 
   const getBook = useCallback(
     async (
@@ -115,7 +107,7 @@ export function useMgvReader() {
           const maker = (askDetails[i].maker as `0x${string}`) || '0x0';
 
           // Calculate price from tick: QUOTE per BASE
-          const price = tickToPriceQperB(tick, baseDec, quoteDec);
+          const price = tickToPrice(tick);
 
           // For asks: gives is BASE, so sizeBase = gives in display units
           const sizeBase = Number(formatUnits(gives, baseDec));
@@ -155,7 +147,7 @@ export function useMgvReader() {
           const maker = (bidDetails[i].maker as `0x${string}`) || '0x0';
 
           // For bids (QUOTE -> BASE), we need to invert the price
-          const rawPrice = tickToPriceQperB(tick, baseDec, quoteDec);
+          const rawPrice = tickToPrice(tick);
           const price = 1 / rawPrice;
 
           // For bids: gives is QUOTE, so valueQuote = gives in display units
@@ -199,7 +191,7 @@ export function useMgvReader() {
         return { asks: [], bids: [] };
       }
     },
-    [getDecimals, tickToPriceQperB]
+    [getDecimals]
   );
 
   const getNumOpenMarkets = useCallback(async (): Promise<number> => {

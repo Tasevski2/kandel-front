@@ -2,26 +2,23 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount, useWriteContract, useBalance } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { Connect } from '@/components/ConnectWrapper';
 import { OrderBook } from '@/components/OrderBook';
 import { ProvisionPanel } from '@/components/ProvisionPanel';
 import { InventoryCard } from '@/components/InventoryCard';
+import { KandelDepositPanel } from '@/components/KandelDepositPanel';
 import { KandelForm } from '@/components/KandelForm';
 import { ChainGuard } from '@/components/ChainGuard';
+import { InlineEditField } from '@/components/InlineEditField';
 import { KandelParams, useKandel } from '@/hooks/useKandel';
 import { useMangrove } from '@/hooks/useMangrove';
 import { useMgvReader } from '@/hooks/useMgvReader';
-import { useTokens } from '@/hooks/useTokens';
 import { useTokensInfo } from '@/hooks/useTokenInfo';
 import { formatAmount, formatEthAmount } from '@/lib/formatting';
-import { parseAmount } from '@/lib/pricing';
 import { useProvision } from '@/hooks/useProvision';
 import { TokenDisplay } from '@/components/TokenDisplay';
-import { KandelABI } from '@/abi/kandel';
-import { MangroveABI } from '@/abi/mangrove';
-import { ADDRESSES } from '@/lib/addresses';
-import { validateStepSize } from '@/lib/validation';
+import { validateGasreq, validateStepSize } from '@/lib/validation';
 
 interface PageProps {
   params: Promise<{
@@ -40,36 +37,15 @@ export default function KandelDetailPage({ params }: PageProps) {
     useMangrove();
   const { getBook } = useMgvReader();
   const { missing } = useProvision();
-  const { writeContractAsync } = useWriteContract();
-  const { erc20Approve } = useTokens();
 
   const [loading, setLoading] = useState(true);
   const [showEditForm, setShowEditForm] = useState(false);
   const [kandelParams, setKandelParams] = useState<KandelParams>();
 
-  // Get token information for decimals
   const { tokensInfo } = useTokensInfo(
     kandelParams ? [kandelParams.base, kandelParams.quote] : []
   );
   const [baseTokenInfo, quoteTokenInfo] = tokensInfo || [null, null];
-
-  // Get user balances
-  const { data: baseBalance } = useBalance({
-    address: userAddress,
-    token: kandelParams?.base,
-    query: { enabled: !!userAddress && !!kandelParams?.base },
-  });
-
-  const { data: quoteBalance } = useBalance({
-    address: userAddress,
-    token: kandelParams?.quote,
-    query: { enabled: !!userAddress && !!kandelParams?.quote },
-  });
-
-  const { data: ethBalance } = useBalance({
-    address: userAddress,
-    query: { enabled: !!userAddress },
-  });
 
   const [marketTickSpacing, setMarketTickSpacing] = useState<bigint>(BigInt(1));
   const [inventory, setInventory] = useState({
@@ -84,137 +60,6 @@ export default function KandelDetailPage({ params }: PageProps) {
   const [perAskProvision, setPerAskProvision] = useState(BigInt(0));
   const [perBidProvision, setPerBidProvision] = useState(BigInt(0));
   const [totalProvisionNeeded, setTotalProvisionNeeded] = useState(BigInt(0));
-
-  // Inline editing state
-  const [editingStepSize, setEditingStepSize] = useState(false);
-  const [editingGasreq, setEditingGasreq] = useState(false);
-  const [tempStepSize, setTempStepSize] = useState('');
-  const [tempGasreq, setTempGasreq] = useState('');
-  const [stepSizeError, setStepSizeError] = useState<string | null>(null);
-  const [gasreqError, setGasreqError] = useState<string | null>(null);
-
-  // Deposit funds state
-  const [baseDepositAmount, setBaseDepositAmount] = useState('');
-  const [quoteDepositAmount, setQuoteDepositAmount] = useState('');
-  const [ethDepositAmount, setEthDepositAmount] = useState('');
-  const [tokenDepositLoading, setTokenDepositLoading] = useState(false);
-  const [ethDepositLoading, setEthDepositLoading] = useState(false);
-
-  function validateGasreq(gasreq: number): string | null {
-    if (gasreq < 1) return 'Gas requirement must be at least 1';
-    if (gasreq > 16777215)
-      return 'Gas requirement is too high (maximum: 16,777,215)';
-    return null;
-  }
-
-  // Deposit validation function
-  function validateDepositAmount(
-    amountStr: string,
-    balanceData: { value: bigint } | null | undefined,
-    tokenSymbol: string,
-    decimals: number = 18
-  ): string | null {
-    if (!amountStr || amountStr.trim() === '') return null;
-
-    const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-      return `${tokenSymbol} amount must be greater than 0`;
-    }
-
-    if (!balanceData) {
-      return `Unable to verify ${tokenSymbol} balance`;
-    }
-
-    // Convert string to BigInt for comparison using correct decimals
-    const amountWei = parseAmount(amountStr, decimals);
-    if (amountWei > balanceData.value) {
-      return `Insufficient ${tokenSymbol} balance`;
-    }
-
-    return null; // Valid
-  }
-
-  // Inline editing handlers
-  const handleStepSizeEdit = () => {
-    if (!kandelParams) return;
-    setTempStepSize(kandelParams.stepSize.toString());
-    setEditingStepSize(true);
-    setStepSizeError(null);
-  };
-
-  const handleStepSizeSave = async () => {
-    if (!kandelParams || !tempStepSize) return;
-
-    const newStepSize = parseInt(tempStepSize);
-    const pricePoints = kandelParams.levelsPerSide * 2;
-    const error = validateStepSize(newStepSize, pricePoints);
-
-    if (error) {
-      setStepSizeError(error);
-      return;
-    }
-
-    try {
-      await writeContractAsync({
-        address: kandelAddress,
-        abi: KandelABI,
-        functionName: 'setStepSize',
-        args: [BigInt(newStepSize)],
-      });
-
-      setEditingStepSize(false);
-      setStepSizeError(null);
-      await fetchData(); // Refresh data
-    } catch (error) {
-      setStepSizeError('Failed to update step size');
-    }
-  };
-
-  const handleStepSizeCancel = () => {
-    setEditingStepSize(false);
-    setTempStepSize('');
-    setStepSizeError(null);
-  };
-
-  const handleGasreqEdit = () => {
-    if (!kandelParams) return;
-    setTempGasreq(kandelParams.gasreq.toString());
-    setEditingGasreq(true);
-    setGasreqError(null);
-  };
-
-  const handleGasreqSave = async () => {
-    if (!kandelParams || !tempGasreq) return;
-
-    const newGasreq = parseInt(tempGasreq);
-    const error = validateGasreq(newGasreq);
-
-    if (error) {
-      setGasreqError(error);
-      return;
-    }
-
-    try {
-      await writeContractAsync({
-        address: kandelAddress,
-        abi: KandelABI,
-        functionName: 'setGasreq',
-        args: [BigInt(newGasreq)],
-      });
-
-      setEditingGasreq(false);
-      setGasreqError(null);
-      await fetchData(); // Refresh data
-    } catch (error) {
-      setGasreqError('Failed to update gas requirement');
-    }
-  };
-
-  const handleGasreqCancel = () => {
-    setEditingGasreq(false);
-    setTempGasreq('');
-    setGasreqError(null);
-  };
 
   const fetchData = useCallback(
     async (showLoading?: boolean) => {
@@ -293,9 +138,44 @@ export default function KandelDetailPage({ params }: PageProps) {
     [kandelAddress]
   );
 
-  useEffect(() => {
-    fetchData(true);
-  }, [fetchData]);
+  const validateStepSizeInput = (value: string) => {
+    if (!kandelParams) return 'Kandel params not loaded';
+    const newStepSize = parseInt(value);
+    const pricePoints = kandelParams.levelsPerSide * 2;
+    return validateStepSize(newStepSize, pricePoints);
+  };
+
+  const validateGasreqInput = (value: string) => {
+    const newGasreq = parseInt(value);
+    return validateGasreq(newGasreq);
+  };
+
+  const handleStepSizeSave = async (value: string) => {
+    if (!kandelParams) throw new Error('Kandel params not loaded');
+
+    const newStepSize = parseInt(value);
+    try {
+      await kandel.setStepSize(newStepSize);
+
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to set step size.');
+    }
+  };
+
+  const handleGasreqSave = async (value: string) => {
+    if (!kandelParams) throw new Error('Kandel params not loaded');
+
+    const newGasreq = parseInt(value);
+
+    try {
+      await kandel.setGasReq(newGasreq);
+
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to set gas requirement.');
+    }
+  };
 
   const handleRetract = async () => {
     try {
@@ -372,124 +252,6 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
   };
 
-  // Deposit funds handlers
-  const handleTokenDeposit = async () => {
-    if (!kandelParams || !userAddress || !baseTokenInfo || !quoteTokenInfo)
-      return;
-
-    // Validate base amount
-    if (baseDepositAmount) {
-      const baseError = validateDepositAmount(
-        baseDepositAmount,
-        baseBalance,
-        baseTokenInfo.symbol,
-        baseTokenInfo.decimals
-      );
-      if (baseError) {
-        alert(baseError);
-        return;
-      }
-    }
-
-    // Validate quote amount
-    if (quoteDepositAmount) {
-      const quoteError = validateDepositAmount(
-        quoteDepositAmount,
-        quoteBalance,
-        quoteTokenInfo.symbol,
-        quoteTokenInfo.decimals
-      );
-      if (quoteError) {
-        alert(quoteError);
-        return;
-      }
-    }
-
-    // Use dynamic decimals
-    const baseAmount = baseDepositAmount
-      ? parseAmount(baseDepositAmount, baseTokenInfo.decimals)
-      : BigInt(0);
-    const quoteAmount = quoteDepositAmount
-      ? parseAmount(quoteDepositAmount, quoteTokenInfo.decimals)
-      : BigInt(0);
-
-    if (baseAmount === BigInt(0) && quoteAmount === BigInt(0)) {
-      alert('Please enter at least one token amount to deposit');
-      return;
-    }
-
-    setTokenDepositLoading(true);
-    try {
-      // Approve tokens if needed
-      if (baseAmount > BigInt(0)) {
-        await erc20Approve(kandelParams.base, kandelAddress, baseAmount);
-      }
-      if (quoteAmount > BigInt(0)) {
-        await erc20Approve(kandelParams.quote, kandelAddress, quoteAmount);
-      }
-
-      // Use kandel.depositFunds which handles the logic internally
-      if (baseAmount > BigInt(0)) {
-        await kandel.depositFunds(kandelParams.base, baseAmount, userAddress);
-      }
-      if (quoteAmount > BigInt(0)) {
-        await kandel.depositFunds(kandelParams.quote, quoteAmount, userAddress);
-      }
-
-      // Clear inputs and refresh data
-      setBaseDepositAmount('');
-      setQuoteDepositAmount('');
-      await fetchData();
-    } catch (error) {
-      console.error('Failed to deposit tokens:', error);
-    } finally {
-      setTokenDepositLoading(false);
-    }
-  };
-
-  const handleEthDeposit = async () => {
-    if (!ethDepositAmount || !userAddress) return;
-
-    // Validate ETH amount
-    const ethError = validateDepositAmount(
-      ethDepositAmount,
-      ethBalance,
-      'ETH',
-      18
-    );
-    if (ethError) {
-      alert(ethError);
-      return;
-    }
-
-    const ethAmount = parseAmount(ethDepositAmount, 18);
-
-    if (ethAmount === BigInt(0)) {
-      alert('Please enter ETH amount to deposit');
-      return;
-    }
-
-    setEthDepositLoading(true);
-    try {
-      // Use Mangrove's fund function to deposit ETH for the Kandel
-      await writeContractAsync({
-        address: ADDRESSES.mangrove,
-        abi: MangroveABI,
-        functionName: 'fund',
-        args: [kandelAddress],
-        value: ethAmount,
-      });
-
-      // Clear input and refresh data
-      setEthDepositAmount('');
-      await fetchData();
-    } catch (error) {
-      console.error('Failed to deposit ETH:', error);
-    } finally {
-      setEthDepositLoading(false);
-    }
-  };
-
   const handleFundProvision = async () => {
     try {
       await fundMaker(kandelAddress, missingProvision);
@@ -499,6 +261,10 @@ export default function KandelDetailPage({ params }: PageProps) {
       console.error('Failed to fund provision:', error);
     }
   };
+
+  useEffect(() => {
+    fetchData(true);
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -641,60 +407,20 @@ export default function KandelDetailPage({ params }: PageProps) {
                               {kandelParams.levelsPerSide}
                             </div>
                           </div>
-                          <div className='flex flex-col'>
-                            <span className='text-xs text-slate-500 mb-1'>
-                              Step Size
-                            </span>
-                            <div className='flex items-center gap-2'>
-                              {editingStepSize ? (
-                                <>
-                                  <input
-                                    type='number'
-                                    value={tempStepSize}
-                                    onChange={(e) =>
-                                      setTempStepSize(e.target.value)
-                                    }
-                                    className='input text-sm w-20 h-8'
-                                    min='1'
-                                    max={Math.max(
-                                      kandelParams.levelsPerSide * 2 - 1,
-                                      1
-                                    )}
-                                  />
-                                  <button
-                                    onClick={handleStepSizeSave}
-                                    className='text-green-400 hover:text-green-300 text-sm px-2 py-1 rounded'
-                                  >
-                                    ✓
-                                  </button>
-                                  <button
-                                    onClick={handleStepSizeCancel}
-                                    className='text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded'
-                                  >
-                                    ✕
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className='text-slate-200 font-medium text-lg'>
-                                    {kandelParams.stepSize}
-                                  </span>
-                                  <button
-                                    onClick={handleStepSizeEdit}
-                                    className='text-slate-400 hover:text-slate-200 text-sm px-2 py-1 rounded hover:bg-slate-700/50'
-                                    title='Edit step size'
-                                  >
-                                    ✏️
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                            {stepSizeError && (
-                              <div className='text-red-400 text-xs mt-1'>
-                                {stepSizeError}
-                              </div>
+                          <InlineEditField
+                            label='Step Size'
+                            value={kandelParams.stepSize}
+                            onSave={handleStepSizeSave}
+                            validate={validateStepSizeInput}
+                            inputType='number'
+                            inputClass='w-20'
+                            min={1}
+                            max={Math.max(
+                              kandelParams.levelsPerSide * 2 - 1,
+                              1
                             )}
-                          </div>
+                            editTooltip='Edit step size'
+                          />
                         </div>
                       </div>
 
@@ -704,56 +430,19 @@ export default function KandelDetailPage({ params }: PageProps) {
                           <span className='w-2 h-2 bg-orange-400 rounded-full'></span>
                           Execution Settings
                         </h3>
-                        <div className='flex flex-col max-w-sm'>
-                          <span className='text-xs text-slate-500 mb-1'>
-                            Gas Requirement
-                          </span>
-                          <div className='flex items-center gap-2'>
-                            {editingGasreq ? (
-                              <>
-                                <input
-                                  type='number'
-                                  value={tempGasreq}
-                                  onChange={(e) =>
-                                    setTempGasreq(e.target.value)
-                                  }
-                                  className='input text-sm w-24 h-8'
-                                  min='1'
-                                  max='16777215'
-                                />
-                                <button
-                                  onClick={handleGasreqSave}
-                                  className='text-green-400 hover:text-green-300 text-sm px-2 py-1 rounded'
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={handleGasreqCancel}
-                                  className='text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded'
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <span className='text-slate-200 font-medium text-lg'>
-                                  {kandelParams.gasreq.toLocaleString()}
-                                </span>
-                                <button
-                                  onClick={handleGasreqEdit}
-                                  className='text-slate-400 hover:text-slate-200 text-sm px-2 py-1 rounded hover:bg-slate-700/50'
-                                  title='Edit gas requirement'
-                                >
-                                  ✏️
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          {gasreqError && (
-                            <div className='text-red-400 text-xs mt-1'>
-                              {gasreqError}
-                            </div>
-                          )}
+                        <div className='max-w-sm'>
+                          <InlineEditField
+                            label='Gas Requirement'
+                            value={kandelParams.gasreq}
+                            onSave={handleGasreqSave}
+                            validate={validateGasreqInput}
+                            inputType='number'
+                            inputClass='w-24'
+                            min={1}
+                            max={16777215}
+                            displayFormatter={(value) => value.toLocaleString()}
+                            editTooltip='Edit gas requirement'
+                          />
                         </div>
                       </div>
                     </div>
@@ -770,7 +459,7 @@ export default function KandelDetailPage({ params }: PageProps) {
                     perBidProvision={perBidProvision}
                     totalProvisionNeeded={totalProvisionNeeded}
                   />
-
+                  {/* Actions */}
                   <div className='card'>
                     <h3 className='text-lg font-semibold text-slate-200 mb-4'>
                       Actions
@@ -834,87 +523,13 @@ export default function KandelDetailPage({ params }: PageProps) {
                     quoteToken={kandelParams.quote}
                   />
 
-                  <div className='card'>
-                    <h3 className='text-lg font-semibold text-slate-200 mb-4'>
-                      Deposit Funds
-                    </h3>
-
-                    {/* Token Deposits */}
-                    <div className='space-y-4'>
-                      <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                          <label className='label text-sm'>
-                            <TokenDisplay address={kandelParams.base} /> Amount
-                          </label>
-                          <input
-                            type='text'
-                            value={baseDepositAmount}
-                            onChange={(e) =>
-                              setBaseDepositAmount(e.target.value)
-                            }
-                            placeholder='0.0'
-                            className='input'
-                            disabled={tokenDepositLoading || ethDepositLoading}
-                          />
-                        </div>
-                        <div>
-                          <label className='label text-sm'>
-                            <TokenDisplay address={kandelParams.quote} /> Amount
-                          </label>
-                          <input
-                            type='text'
-                            value={quoteDepositAmount}
-                            onChange={(e) =>
-                              setQuoteDepositAmount(e.target.value)
-                            }
-                            placeholder='0.0'
-                            className='input'
-                            disabled={tokenDepositLoading || ethDepositLoading}
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleTokenDeposit}
-                        disabled={
-                          tokenDepositLoading ||
-                          (!baseDepositAmount && !quoteDepositAmount)
-                        }
-                        className='btn-primary w-full disabled:opacity-50'
-                      >
-                        {tokenDepositLoading
-                          ? 'Depositing...'
-                          : 'Deposit Tokens'}
-                      </button>
-
-                      {/* ETH Deposit */}
-                      <div className='border-t border-slate-600 pt-4'>
-                        <div>
-                          <label className='label text-sm'>
-                            ETH Amount (Provision)
-                          </label>
-                          <input
-                            type='text'
-                            value={ethDepositAmount}
-                            onChange={(e) =>
-                              setEthDepositAmount(e.target.value)
-                            }
-                            placeholder='0.0'
-                            className='input'
-                            disabled={tokenDepositLoading || ethDepositLoading}
-                          />
-                        </div>
-
-                        <button
-                          onClick={handleEthDeposit}
-                          disabled={ethDepositLoading || !ethDepositAmount}
-                          className='btn-secondary w-full mt-2 disabled:opacity-50'
-                        >
-                          {ethDepositLoading ? 'Depositing...' : 'Deposit ETH'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  {baseTokenInfo && quoteTokenInfo && (
+                    <KandelDepositPanel
+                      kandelAddress={kandelAddress}
+                      baseTokenInfo={baseTokenInfo}
+                      quoteTokenInfo={quoteTokenInfo}
+                    />
+                  )}
                 </div>
               </div>
 

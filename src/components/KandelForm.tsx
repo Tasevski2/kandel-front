@@ -1,32 +1,41 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useWriteContract, useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance } from 'wagmi';
 import { useMangrove } from '../hooks/useMangrove';
 import { useKandelSeeder } from '../hooks/useKandelSeeder';
 import { useKandel } from '../hooks/useKandel';
 import { useProvision } from '../hooks/useProvision';
 import { useTokensInfo } from '../hooks/useTokenInfo';
 import { useTokens } from '../hooks/useTokens';
-import { DEFAULT_STEP, DEFAULT_LEVELS_PER_SIDE } from '../lib/constants';
+import {
+  DEFAULT_STEP,
+  DEFAULT_LEVELS_PER_SIDE,
+  DEFAULT_PAGE_SIZE,
+  MAX_TICK,
+  MIN_TICK,
+} from '../lib/constants';
 import {
   createGeometricDistribution,
   type MarketParams,
 } from '@mangrovedao/mgv';
-import { parseAmount } from '../lib/pricing';
+import { maxPriceToTick, minPriceToTick, parseAmount } from '../lib/pricing';
 import {
   formatAmount,
   formatEthAmount,
   formatTokenAmount,
 } from '../lib/formatting';
-import { KandelABI } from '../abi/kandel';
 import { TokenDisplay } from './TokenDisplay';
 import type { Market } from '../hooks/useMarkets';
 import { readContract } from '@wagmi/core';
 import { config } from '../hooks/useChain';
 import { readerAbi } from '../abi/reader';
 import { ADDRESSES } from '../lib/addresses';
-import { validateStepSize } from '@/lib/validation';
+import {
+  validateStepSize,
+  validateLevelsPerSide,
+  validatePriceRange,
+} from '@/lib/validation';
 
 interface KandelFormProps {
   kandelAddress?: `0x${string}`;
@@ -57,7 +66,7 @@ async function fetchMakerOffers(
   reader: `0x${string}`,
   key: OLKey,
   maker: `0x${string}`,
-  page = BigInt(64) // how many rows per offerList call
+  page = BigInt(DEFAULT_PAGE_SIZE) // how many rows per offerList call
 ): Promise<OfferWithTick[]> {
   const res: OfferWithTick[] = [];
   let cursor = BigInt(0);
@@ -220,6 +229,9 @@ export function KandelForm({
   const [minVolumeError, setMinVolumeError] = useState<string | null>(null);
   const [stepSizeError, setStepSizeError] = useState<string | null>(null);
   const [priceRangeError, setPriceRangeError] = useState<string | null>(null);
+  const [levelsPerSideError, setLevelsPerSideError] = useState<string | null>(
+    null
+  );
 
   // Track whether user has edited price fields
   const [minPriceTouched, setMinPriceTouched] = useState(false);
@@ -282,7 +294,6 @@ export function KandelForm({
   );
   const { minGives, missing } = useProvision();
   const { erc20Approve } = useTokens();
-  const { writeContractAsync } = useWriteContract();
 
   // Helper function to filter numeric input for price fields
   const handlePriceChange = (
@@ -463,6 +474,29 @@ export function KandelForm({
       setStepSizeError(stepSizeValidation);
     }
   }, [step, levelsPerSide]);
+
+  // Real-time levels per side validation
+  useEffect(() => {
+    // Clear previous error
+    setLevelsPerSideError(null);
+
+    // Skip if value is empty
+    if (!levelsPerSide.trim()) return;
+
+    const levelsInt = parseInt(levelsPerSide);
+
+    // Check if it's a valid number
+    if (isNaN(levelsInt)) {
+      setLevelsPerSideError('Levels per side must be a number');
+      return;
+    }
+
+    // Validate using the validation function
+    const validation = validateLevelsPerSide(levelsInt);
+    if (validation) {
+      setLevelsPerSideError(validation);
+    }
+  }, [levelsPerSide]);
 
   // Load user free balance for provision calculation
   useEffect(() => {
@@ -707,22 +741,13 @@ export function KandelForm({
         }
 
         // Calculate distribution parameters with bounds checking
-        const minTick = Math.floor(Math.log(minP) / Math.log(1.0001));
-        const maxTick = Math.ceil(Math.log(maxP) / Math.log(1.0001));
+        const minTick = minPriceToTick(minP);
+        const maxTick = maxPriceToTick(maxP);
 
         // Bounds checking for tick values to prevent overflow
-        const MAX_TICK = 887272; // Maximum valid tick value
-        const MIN_TICK = -887272; // Minimum valid tick value
-
-        if (
-          minTick < MIN_TICK ||
-          minTick > MAX_TICK ||
-          maxTick < MIN_TICK ||
-          maxTick > MAX_TICK
-        ) {
-          throw new Error(
-            'Price range is too extreme. Please choose prices closer to the current market price.'
-          );
+        const rangeValidationError = validatePriceRange(minTick, maxTick);
+        if (rangeValidationError) {
+          throw new Error(rangeValidationError);
         }
 
         const totalTickRange = maxTick - minTick;
@@ -1097,8 +1122,8 @@ export function KandelForm({
         tickOffsetBetweenLevels = totalTickRange / BigInt(pricePoints - 1);
       } else {
         // Recalculate from user input (create mode or prices edited)
-        minTick = BigInt(Math.floor(Math.log(minP) / Math.log(1.0001)));
-        maxTick = BigInt(Math.ceil(Math.log(maxP) / Math.log(1.0001)));
+        minTick = BigInt(minPriceToTick(minP));
+        maxTick = BigInt(maxPriceToTick(maxP));
         const totalTickRange = maxTick - minTick;
         tickOffsetBetweenLevels = totalTickRange / BigInt(pricePoints - 1);
       }
@@ -1219,28 +1244,23 @@ export function KandelForm({
           ? 0
           : Number(gasreqBigInt);
 
-      await writeContractAsync({
-        address: address,
-        abi: KandelABI,
-        functionName: 'populateFromOffset',
-        args: [
-          BigInt(0), // from: start index
-          BigInt(pricePoints), // to: end index
-          minTick, // baseQuoteTickIndex0
-          tickOffsetBetweenLevels, // _baseQuoteTickOffset
-          BigInt(levels), // firstAskIndex
-          bidGivesPerLevel, // bidGives
-          askGivesPerLevel, // askGives
-          {
-            gasprice: 0, // Use market gas price (0 = use default)
-            gasreq: gasreqForContract, // 0 = keep existing, else update
-            stepSize: parseInt(step), // Must be uint32
-            pricePoints: pricePoints, // Must be uint32
-          },
-          baseAmountForContract, // baseAmount to add to inventory
-          quoteAmountForContract, // quoteAmount to add to inventory
-        ],
-        value: provision.missing,
+      await kandel.populateFromOffset({
+        from: BigInt(0), // start index
+        to: BigInt(pricePoints), // end index
+        minTick, // baseQuoteTickIndex0
+        tickOffsetBetweenLevels, // _baseQuoteTickOffset
+        firstAskIndex: BigInt(levels), // firstAskIndex
+        bidGivesPerLevel, // bidGives
+        askGivesPerLevel, // askGives
+        params: {
+          gasprice: 0, // Use market gas price (0 = use default)
+          gasreq: gasreqForContract, // 0 = keep existing, else update
+          stepSize: parseInt(step), // Must be uint32
+          pricePoints: pricePoints, // Must be uint32
+        },
+        baseAmount: baseAmountForContract, // baseAmount to add to inventory
+        quoteAmount: quoteAmountForContract, // quoteAmount to add to inventory
+        provisionValue: provision.missing,
       });
 
       if (onSuccess) {
@@ -1427,6 +1447,9 @@ export function KandelForm({
               required
               className='input'
             />
+            {levelsPerSideError && (
+              <p className='text-red-400 text-sm mt-1'>{levelsPerSideError}</p>
+            )}
           </div>
         </div>
       </div>
@@ -1581,6 +1604,7 @@ export function KandelForm({
               loading ||
               parseInt(levelsPerSide) === 0 ||
               stepSizeError !== null ||
+              levelsPerSideError !== null ||
               minVolumeError !== null ||
               priceRangeError !== null ||
               (isEditing && !hasAnyChanges)

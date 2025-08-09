@@ -4,15 +4,15 @@ import { readContract } from '@wagmi/core';
 import { KandelABI } from '../abi/kandel';
 import { MangroveABI } from '../abi/mangrove';
 import { readerAbi } from '../abi/reader';
-import { erc20Abi } from 'viem';
 import { ADDRESSES } from '../lib/addresses';
 import { config } from './useChain';
-import { tickToPriceSimple } from '../lib/pricing';
+import { tickToPrice } from '../lib/pricing';
 import { useTokens } from './useTokens';
-
-const MAX_UINT256 = BigInt(
-  '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-);
+import {
+  MAX_UINT256,
+  DEFAULT_PAGE_SIZE,
+  MAX_OFFER_FETCH_DEPTH,
+} from '@/lib/constants';
 
 type OLKey = {
   outbound_tkn: `0x${string}`;
@@ -34,7 +34,7 @@ async function fetchBaseQuoteTickIndex0(
   base: `0x${string}`,
   quote: `0x${string}`,
   tickSpacing: bigint,
-  page = BigInt(64)
+  page = BigInt(DEFAULT_PAGE_SIZE)
 ): Promise<{ id: bigint; tick: bigint; index: number } | null> {
   const asksKey: OLKey = {
     outbound_tkn: base,
@@ -79,6 +79,25 @@ export interface KandelParams {
   baseQuoteTickIndex0?: bigint;
   minTick?: bigint;
   maxTick?: bigint;
+}
+
+export interface PopulateFromOffsetParams {
+  from: bigint;
+  to: bigint;
+  minTick: bigint;
+  tickOffsetBetweenLevels: bigint;
+  firstAskIndex: bigint;
+  bidGivesPerLevel: bigint;
+  askGivesPerLevel: bigint;
+  params: {
+    gasprice: number;
+    gasreq: number;
+    stepSize: number;
+    pricePoints: number;
+  };
+  baseAmount: bigint;
+  quoteAmount: bigint;
+  provisionValue: bigint;
 }
 
 export interface LadderItem {
@@ -174,8 +193,8 @@ export function useKandel(kandelAddr: `0x${string}`) {
       maxTick = baseQuoteTickIndex0 + (levels - BigInt(1)) * tickOffsetBigInt;
 
       // Convert ticks to prices
-      minPrice = tickToPriceSimple(minTick);
-      maxPrice = tickToPriceSimple(maxTick);
+      minPrice = tickToPrice(minTick);
+      maxPrice = tickToPrice(maxTick);
     } else {
       // Fallback: fetch all offers and calculate min/max from actual prices
       const [askResult, bidResult] = await Promise.all([
@@ -190,7 +209,7 @@ export function useKandel(kandelAddr: `0x${string}`) {
               tickSpacing: effectiveTickSpacing,
             },
             BigInt(0),
-            BigInt(100),
+            BigInt(MAX_OFFER_FETCH_DEPTH),
           ],
         }),
         readContract(config, {
@@ -204,7 +223,7 @@ export function useKandel(kandelAddr: `0x${string}`) {
               tickSpacing: effectiveTickSpacing,
             },
             BigInt(0),
-            BigInt(100),
+            BigInt(MAX_OFFER_FETCH_DEPTH),
           ],
         }),
       ]);
@@ -230,7 +249,7 @@ export function useKandel(kandelAddr: `0x${string}`) {
         const maker = askDetails[i]?.maker as `0x${string}`;
         if (maker && maker.toLowerCase() === kandelAddrLower) {
           const { tick } = askOffers[i] as { tick: bigint };
-          const price = tickToPriceSimple(tick);
+          const price = tickToPrice(tick);
           kandelPrices.push(price);
         }
       });
@@ -240,7 +259,7 @@ export function useKandel(kandelAddr: `0x${string}`) {
         const maker = bidDetails[i]?.maker as `0x${string}`;
         if (maker && maker.toLowerCase() === kandelAddrLower) {
           const { tick } = bidOffers[i] as { tick: bigint };
-          const rawPrice = tickToPriceSimple(tick);
+          const rawPrice = tickToPrice(tick);
           const price = 1 / rawPrice;
           kandelPrices.push(price);
         }
@@ -569,8 +588,6 @@ export function useKandel(kandelAddr: `0x${string}`) {
     }
   };
 
-  // Removed approveToken function - now using erc20Approve from useTokens
-
   const depositFunds = async (
     tokenAddress: `0x${string}`,
     amount: bigint,
@@ -632,99 +649,48 @@ export function useKandel(kandelAddr: `0x${string}`) {
     }
   };
 
-  const updateKandelParams = async (
-    updates: {
-      levels?: number;
-      step?: number;
-      gasreq?: number;
-      minPrice?: number;
-      maxPrice?: number;
-    },
-    tokenInfo: {
-      baseSymbol: string;
-      quoteSymbol: string;
-      baseDecimals: number;
-      quoteDecimals: number;
-    }
-  ) => {
-    setLoading(true);
-    setError(null);
+  const setStepSize = async (stepSize: number) => {
+    await writeContractAsync({
+      address: kandelAddr,
+      abi: KandelABI,
+      functionName: 'setStepSize',
+      args: [BigInt(stepSize)],
+    });
+  };
 
-    try {
-      // Get current parameters
-      const currentParams = await getParams();
-      const tickSpacing = await getTickSpacing();
+  const setGasReq = async (gasreq: number) => {
+    await writeContractAsync({
+      address: kandelAddr,
+      abi: KandelABI,
+      functionName: 'setGasreq',
+      args: [BigInt(gasreq)],
+    });
+  };
 
-      // Merge updates with current values
-      const levels = updates.levels ?? currentParams.levelsPerSide;
-      const step = updates.step ?? currentParams.stepSize;
-      const gasreq = updates.gasreq ?? currentParams.gasreq;
-      const minPrice = updates.minPrice ?? currentParams.minPrice;
-      const maxPrice = updates.maxPrice ?? currentParams.maxPrice;
-
-      const pricePoints = levels * 2;
-
-      // Market parameters no longer needed since we're using populateFromOffset
-
-      // Get current reserves to maintain existing inventory
-      const reserves = await getInventory();
-
-      // Calculate geometric distribution parameters
-      const tickSpacingInt = Number(tickSpacing);
-      const minTick = Math.log(minPrice) / Math.log(1.0001);
-      const maxTick = Math.log(maxPrice) / Math.log(1.0001);
-      // centerTick no longer needed since we're using populateFromOffset
-      const tickOffsetBetweenLevels = BigInt(
-        Math.round((maxTick - minTick) / pricePoints / tickSpacingInt) *
-          tickSpacingInt
-      );
-
-      // Calculate per-level amounts from current reserves to maintain existing inventory
-      const bidGivesPerLevel =
-        reserves.quoteQty > BigInt(0)
-          ? reserves.quoteQty / BigInt(levels)
-          : BigInt(1);
-      const askGivesPerLevel =
-        reserves.baseQty > BigInt(0)
-          ? reserves.baseQty / BigInt(levels)
-          : BigInt(1);
-
-      // No longer need to create distribution since we're using populateFromOffset
-
-      // Update using populateFromOffset function
-      await writeContractAsync({
-        address: kandelAddr,
-        abi: KandelABI,
-        functionName: 'populateFromOffset',
-        args: [
-          BigInt(0), // from: start index
-          BigInt(pricePoints), // to: end index
-          BigInt(Math.round(minTick)), // baseQuoteTickIndex0
-          tickOffsetBetweenLevels, // _baseQuoteTickOffset
-          BigInt(levels), // firstAskIndex
-          bidGivesPerLevel, // bidGives
-          askGivesPerLevel, // askGives
-          {
-            gasprice: 0, // Use market gas price
-            gasreq: gasreq,
-            stepSize: step,
-            pricePoints: pricePoints,
-          },
-          BigInt(0), // baseAmount - maintain current
-          BigInt(0), // quoteAmount - maintain current
-        ],
-        value: BigInt(0), // No additional provision needed for param updates
-      });
-
-      return { success: true };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Parameter update failed';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
-    }
+  const populateFromOffset = async (params: PopulateFromOffsetParams) => {
+    await writeContractAsync({
+      address: kandelAddr,
+      abi: KandelABI,
+      functionName: 'populateFromOffset',
+      args: [
+        params.from,
+        params.to,
+        params.minTick,
+        params.tickOffsetBetweenLevels,
+        params.firstAskIndex,
+        params.bidGivesPerLevel,
+        params.askGivesPerLevel,
+        {
+          gasprice: params.params.gasprice,
+          gasreq: params.params.gasreq,
+          stepSize: params.params.stepSize,
+          pricePoints: params.params.pricePoints,
+        },
+        params.baseAmount,
+        params.quoteAmount,
+      ],
+      value: params.provisionValue,
+    });
   };
 
   return {
@@ -741,7 +707,9 @@ export function useKandel(kandelAddr: `0x${string}`) {
     retractAndWithdrawAll,
     getReserveBalances,
     depositFunds,
-    updateKandelParams,
+    setGasReq,
+    setStepSize,
+    populateFromOffset,
     loading,
     error,
   };

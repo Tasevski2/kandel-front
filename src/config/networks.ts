@@ -15,12 +15,6 @@ export const anvil = defineChain({
       http: [process.env.NEXT_PUBLIC_ANVIL_RPC_URL || 'http://127.0.0.1:8545'],
     },
   },
-  blockExplorers: {
-    default: {
-      name: 'Anvil',
-      url: process.env.NEXT_PUBLIC_ANVIL_RPC_URL || 'http://127.0.0.1:8545',
-    },
-  },
 });
 
 // Base mainnet configuration

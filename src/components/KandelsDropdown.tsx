@@ -7,6 +7,7 @@ import { useKandelOfferedVolume } from '../hooks/useKandelOfferedVolume';
 import { KandelVolumeIndicator } from './KandelVolumeIndicator';
 import { useTokensInfo } from '../hooks/useTokenInfo';
 import type { StoredKandel } from '../hooks/useKandels';
+import { KANDEL_LABELS } from '../lib/ui-constants';
 
 interface KandelsDropdownProps {
   kandels: StoredKandel[];
@@ -17,7 +18,7 @@ interface KandelsDropdownProps {
 export function KandelsDropdown({
   kandels,
   loading = false,
-  placeholder = 'Your Kandel Positions',
+  placeholder = KANDEL_LABELS.yourKandels,
 }: KandelsDropdownProps) {
   const router = useRouter();
   const { getOfferedVolume } = useKandelOfferedVolume(kandels);
@@ -140,7 +141,7 @@ export function KandelsDropdown({
           <div className='max-h-60 overflow-y-auto'>
             {kandels.length === 0 ? (
               <div className='px-3 py-4 text-center text-slate-400 text-sm'>
-                No Kandel positions found
+                {KANDEL_LABELS.noPositionsFound}
                 <p className='text-xs text-slate-500 mt-1'>
                   Create your first Kandel position
                 </p>

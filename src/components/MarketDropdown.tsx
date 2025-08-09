@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { TokenPairDisplay } from './TokenDisplay';
 import type { Market } from '../hooks/useMarkets';
+import { MARKET_LABELS } from '../lib/ui-constants';
 
 interface MarketDropdownProps {
   markets: Market[];
@@ -18,7 +19,7 @@ export function MarketDropdown({
   selectedMarket,
   onMarketSelect,
   loading = false,
-  placeholder = "Select a market",
+  placeholder = MARKET_LABELS.selectMarket,
   allowEmpty = false,
 }: MarketDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);

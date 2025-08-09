@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract } from 'wagmi';
+import { useWriteContract } from 'wagmi';
 import { useCallback } from 'react';
 import { readContract } from '@wagmi/core';
 import { MangroveABI } from '../abi/mangrove';
