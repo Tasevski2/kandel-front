@@ -27,10 +27,10 @@ export const anvil = defineChain({
 export const baseMainnet = {
   ...base,
   rpcUrls: {
-    ...base.rpcUrls,
     default: {
       http: [
-        process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
+        process.env.NEXT_PUBLIC_BASE_RPC_URL || '',
+        'https://base-rpc.publicnode.com',
       ],
     },
   },
