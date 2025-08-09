@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kandel Position Manager
 
-## Getting Started
+A minimal functional dApp for managing Kandel positions on Mangrove Protocol.
 
-First, run the development server:
+## Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Node.js 18+ and npm
+2. MetaMask browser extension
+3. Local Anvil chain running on port 8545
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup Instructions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Start Anvil and deploy contracts** (in the parent directory):
+   ```bash
+   # Install Bun if not already installed
+   curl -fsSL https://bun.sh/install | bash
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   # In the parent directory (mangrove-local-main)
+   cd ..
+   bun install
+   bun run src/index.ts
+   ```
 
-## Learn More
+2. **Update contract addresses**:
+   After running the deployment script, copy the printed addresses to `src/lib/deployments.local.json`
 
-To learn more about Next.js, take a look at the following resources:
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. **Configure MetaMask**:
+   - Add custom network:
+     - Network Name: Anvil
+     - RPC URL: http://127.0.0.1:8545
+     - Chain ID: 31337
+     - Currency Symbol: ETH
+   - Import one of the Anvil test accounts using private keys
 
-## Deploy on Vercel
+## Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ✅ MetaMask wallet connection
+- ✅ Two-column order book display (Bids/Asks)
+- ✅ Create new Kandel positions
+- ✅ View and manage existing positions
+- ✅ Edit position parameters
+- ✅ Retract offers and withdraw funds
+- ✅ Provision calculation and validation
+- ✅ Density enforcement
+- ✅ Dark theme UI inspired by Mangrove Exchange
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
+
+See `README_REPORT.md` for detailed architecture overview and APR calculation proposal.
+
+## Development
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run lint` - Run ESLint
+
+## Notes
+
+- Default deployment uses mock ERC20 tokens as BASE and QUOTE
+- Provision is automatically calculated based on gas requirements
+- Minimum volume (density) is enforced to prevent spam offers

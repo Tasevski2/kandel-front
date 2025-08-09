@@ -1,0 +1,9 @@
+{
+  "chainId": 8453,
+  "chainName": "Base",
+  "contracts": {
+    "mangrove": "0x22613524f5905Cb17cbD785b956e9238Bf725FAa",
+    "mgvReader": "0xe5B118Ea1ffBC502EA7A666376d448209BFB50d3",
+    "kandelSeeder": "0x808bC04030bC558C99E6844e877bb22D166A089A"
+  }
+}

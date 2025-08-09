@@ -1,103 +1,156 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Connect } from '../components/ConnectWrapper';
+import { ChainGuard } from '../components/ChainGuard';
+import { MarketDropdown } from '../components/MarketDropdown';
+import { KandelsDropdown } from '../components/KandelsDropdown';
+import { OrderBook } from '../components/OrderBook';
+import { useMarkets } from '../hooks/useMarkets';
+import { useKandels } from '../hooks/useKandels';
+import { useMgvReader } from '../hooks/useMgvReader';
+import type { Market } from '../hooks/useMarkets';
+
+export default function HomePage() {
+  const router = useRouter();
+  const { markets, loading, error } = useMarkets();
+  const { kandels, loading: kandelsLoading } = useKandels();
+  const { getNumOpenMarkets } = useMgvReader();
+  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
+  const [openMarketsCount, setOpenMarketsCount] = useState<number | null>(null);
+
+  // Set first market as default when markets are loaded
+  useEffect(() => {
+    if (markets.length > 0 && !selectedMarket) {
+      setSelectedMarket(markets[0]);
+    }
+  }, [markets, selectedMarket]);
+
+  // Fetch on-chain market count
+  useEffect(() => {
+    const fetchMarketCount = async () => {
+      try {
+        const count = await getNumOpenMarkets();
+        setOpenMarketsCount(count);
+      } catch (error) {
+        setOpenMarketsCount(null);
+      }
+    };
+
+    fetchMarketCount();
+  }, [getNumOpenMarkets]);
+
+  const handleCreateKandel = () => {
+    router.push('/kandel/new');
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className='min-h-screen p-8'>
+      <div className='max-w-7xl mx-auto'>
+        <header className='flex justify-between items-center mb-8'>
+          <div>
+            <h1 className='text-3xl font-bold text-slate-100'>
+              Kandel Position Manager
+            </h1>
+            <p className='text-slate-400 mt-1'>
+              Select a market to view order book and manage your Kandel
+              positions
+            </p>
+          </div>
+          <Connect />
+        </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <ChainGuard>
+          <div className='space-y-6'>
+            {/* Error message */}
+            {error && (
+              <div className='bg-red-500/20 border border-red-500/50 rounded-lg p-4'>
+                <p className='text-red-400'>{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className='btn-secondary mt-2 text-sm'
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Top Row: Market Selection + Your Kandels */}
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              {/* Market Selection */}
+              <div className='card'>
+                <h2 className='text-xl font-semibold text-slate-200 mb-4'>
+                  Market Selection
+                </h2>
+                <MarketDropdown
+                  markets={markets}
+                  selectedMarket={selectedMarket}
+                  onMarketSelect={setSelectedMarket}
+                  loading={loading}
+                  placeholder='Select a market to get started'
+                />
+                {openMarketsCount !== null && (
+                  <p className='text-slate-500 text-sm mt-2'>
+                    {openMarketsCount} markets available
+                  </p>
+                )}
+              </div>
+
+              {/* Your Kandels */}
+              <div className='card'>
+                <h2 className='text-xl font-semibold text-slate-200 mb-4'>
+                  Your Kandels
+                </h2>
+                <div className='space-y-3'>
+                  <KandelsDropdown
+                    kandels={kandels}
+                    loading={kandelsLoading}
+                    placeholder='No Kandel positions yet'
+                  />
+                  <div className='flex gap-3'>
+                    <button
+                      onClick={handleCreateKandel}
+                      className='btn-primary flex-1'
+                      disabled={!selectedMarket}
+                    >
+                      Create New Kandel
+                    </button>
+                  </div>
+                  {kandels.length > 0 && (
+                    <p className='text-slate-500 text-sm'>
+                      {kandels.length} total Kandel
+                      {kandels.length === 1 ? '' : 's'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Full-width Order Book */}
+            {selectedMarket && (
+              <OrderBook
+                base={selectedMarket.baseToken}
+                quote={selectedMarket.quoteToken}
+                tickSpacing={selectedMarket.tickSpacing}
+                highlightMakers={kandels.map((k) => k.address as `0x${string}`)}
+              />
+            )}
+
+            {!selectedMarket && !loading && markets.length === 0 && (
+              <div className='text-center py-12'>
+                <div className='text-slate-400 text-lg mb-2'>
+                  No markets found
+                </div>
+                <p className='text-slate-500'>
+                  There are currently no active markets on this Mangrove
+                  instance.
+                </p>
+              </div>
+            )}
+          </div>
+        </ChainGuard>
+      </div>
     </div>
   );
 }
