@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useReadContract } from 'wagmi';
 import { formatUnits, type Address } from 'viem';
 import { readerAbi } from '@/abi/reader';
-import { MAX_OFFER_FETCH_DEPTH } from '@/lib/constants';
+import { MAX_OFFER_FETCH_DEPTH, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { ADDRESSES } from '@/lib/addresses';
 import { tickToPrice } from '@/lib/pricing';
 
@@ -73,6 +73,7 @@ export function useGetOffers({
       enabled && !!olKey
         ? [olKey, BigInt(0), BigInt(MAX_OFFER_FETCH_DEPTH)]
         : undefined,
+    scopeKey: QUERY_SCOPE_KEYS.OFFER_LIST,
     query: {
       enabled: enabled && !!olKey,
     },

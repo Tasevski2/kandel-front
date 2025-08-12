@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useConfig, useWriteContract } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import type { Address } from 'viem';
 import { KandelABI } from '@/abi/kandel';
-import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
-import { config } from '@/config/wagmiConfig';
+import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { useErc20Approve } from '../../token/useErc20Approve';
+import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 
 type DepositFundsArgs = {
   kandel: Address;
@@ -18,6 +18,8 @@ type DepositFundsArgs = {
 };
 
 export function useDepositFunds() {
+  const config = useConfig();
+  const { invalidateQueriesByScopeKey } = useInvalidateQueries();
   const { erc20Approve } = useErc20Approve();
   const { writeContractAsync } = useWriteContract();
 
@@ -45,6 +47,11 @@ export function useDepositFunds() {
         hash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      await invalidateQueriesByScopeKey(
+        QUERY_SCOPE_KEYS.RESERVE_BALANCES,
+        true
+      );
 
       return receipt;
     } catch (error) {

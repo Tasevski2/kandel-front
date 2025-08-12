@@ -1,8 +1,5 @@
-'use client';
-
-import { useMemo } from 'react';
 import { formatTokenAmount } from '../lib/formatting';
-import { TokenInfo, useTokensInfo } from '../hooks/token/useTokenInfo';
+import { TokenInfo } from '../hooks/token/useTokenInfo';
 
 interface InventoryCardProps {
   baseQty: bigint;
@@ -10,8 +7,6 @@ interface InventoryCardProps {
   nOffers: number;
   baseTokenInfo?: TokenInfo;
   quoteTokenInfo?: TokenInfo;
-  baseSymbol?: string;
-  quoteSymbol?: string;
 }
 
 export function InventoryCard({
@@ -20,13 +15,10 @@ export function InventoryCard({
   nOffers,
   baseTokenInfo,
   quoteTokenInfo,
-  baseSymbol,
-  quoteSymbol,
 }: InventoryCardProps) {
   // Use provided symbols or get from fetched token info
-  const finalBaseSymbol = baseSymbol || baseTokenInfo?.symbol || 'Loading...';
-  const finalQuoteSymbol =
-    quoteSymbol || quoteTokenInfo?.symbol || 'Loading...';
+  const finalBaseSymbol = baseTokenInfo?.symbol || 'Loading...';
+  const finalQuoteSymbol = quoteTokenInfo?.symbol || 'Loading...';
   const baseDecimals = baseTokenInfo?.decimals || 18;
   const quoteDecimals = quoteTokenInfo?.decimals || 6;
   return (

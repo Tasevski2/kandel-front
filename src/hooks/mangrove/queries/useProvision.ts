@@ -1,5 +1,6 @@
 import { readerAbi } from '@/abi/reader';
 import { ADDRESSES } from '@/lib/addresses';
+import { QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { useMemo } from 'react';
 import type { Address } from 'viem';
 import { useReadContracts } from 'wagmi';
@@ -55,6 +56,7 @@ export function useProvision({
           },
         ] as const),
     allowFailure: false,
+    scopeKey: QUERY_SCOPE_KEYS.PROVISION,
     query: { enabled },
   });
 

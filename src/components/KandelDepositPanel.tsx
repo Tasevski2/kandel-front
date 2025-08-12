@@ -99,7 +99,6 @@ export function KandelDepositPanel({
       }
     }
 
-    // Parse amounts
     const baseAmount = baseDepositAmount
       ? parseAmount(baseDepositAmount, baseTokenInfo.decimals)
       : BigInt(0);

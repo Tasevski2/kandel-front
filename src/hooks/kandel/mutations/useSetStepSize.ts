@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useConfig, useWriteContract } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { KandelABI } from '@/abi/kandel';
-import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
-import { config } from '@/config/wagmiConfig';
+import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
+import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 
 interface SetStepSizeParams {
   kandelAddr: Address;
@@ -12,6 +12,8 @@ interface SetStepSizeParams {
 }
 
 export function useSetStepSize() {
+  const config = useConfig();
+  const { invalidateQueriesByScopeKey } = useInvalidateQueries();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,6 +37,8 @@ export function useSetStepSize() {
         hash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      await invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.PARAMS);
 
       return receipt;
     } catch (error) {

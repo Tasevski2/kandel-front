@@ -11,7 +11,7 @@ export type KandelStaticParams = {
   tickSpacing: bigint;
 };
 
-export function useGetKandelStatisParams(kandelAddr: Address) {
+export function useGetKandelStaticParams(kandelAddr: Address) {
   const { data, isLoading } = useReadContracts({
     allowFailure: false,
     contracts: [

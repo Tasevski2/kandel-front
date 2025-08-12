@@ -40,7 +40,6 @@ export function KandelsDropdown({
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -55,7 +54,6 @@ export function KandelsDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter kandels based on search term
   const filteredKandels = kandels.filter((kandel) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
@@ -163,11 +161,9 @@ export function KandelsDropdown({
                           quoteTokenInfo={tokensInfo[kandel.quoteToken]}
                         />
                         {(() => {
-                          // Find token info for this kandel
                           const baseTokenInfo = tokensInfo[kandel.baseToken];
                           const quoteTokenInfo = tokensInfo[kandel.quoteToken];
 
-                          // Only show volume indicator if we have token info
                           if (baseTokenInfo && quoteTokenInfo) {
                             return (
                               <KandelVolumeIndicator
@@ -180,7 +176,6 @@ export function KandelsDropdown({
                             );
                           }
 
-                          // Fallback loading state
                           return (
                             <span className='text-xs px-2 py-0.5 rounded-full font-medium bg-slate-500/20 text-slate-400'>
                               Loading...

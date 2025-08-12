@@ -39,7 +39,6 @@ export function InlineEditField({
   };
 
   const handleSave = async () => {
-    // Validate if validation function is provided
     if (validate) {
       const validationError = validate(tempValue);
       if (validationError) {
@@ -112,9 +111,7 @@ export function InlineEditField({
           </>
         )}
       </div>
-      {error && (
-        <div className='text-red-400 text-xs mt-1'>{error}</div>
-      )}
+      {error && <div className='text-red-400 text-xs mt-1'>{error}</div>}
     </div>
   );
 }

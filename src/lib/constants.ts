@@ -22,3 +22,14 @@ export const MAX_UINT32 = 4294967295;
 
 // Transaction confirmation settings
 export const TRANSACTION_CONFIRMATIONS = 1;
+
+// Simple Query Scope Keys named by the contract function that we are calling ( did not want to overcomplicate the invalidations )
+export const QUERY_SCOPE_KEYS = {
+  BASE_QUOTE_TICK_OFFSET: 'baseQuoteTickOffset',
+  PARAMS: 'params',
+  BALANCE_OF: 'balanceOf',
+  OFFER_LIST: 'offerList',
+  PROVISION: 'provision',
+  RESERVE_BALANCES: 'reserveBalances',
+  OFFERED_VOLUMES: 'offeredVolumes',
+};

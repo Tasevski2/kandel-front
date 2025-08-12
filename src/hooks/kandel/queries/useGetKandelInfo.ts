@@ -6,7 +6,7 @@ import type { Address } from 'viem';
 import { useTokensInfo, type TokenInfo } from '@/hooks/token/useTokenInfo';
 import { tickToPrice } from '@/lib/pricing';
 import { useGetKandelParams } from './useGetKandelParams';
-import { useGetKandelStatisParams } from './useGetKandelStaticParams';
+import { useGetKandelStaticParams } from './useGetKandelStaticParams';
 import { useGetBaseQuoteTickIndex0 } from './useGetBaseQuoteTickIndex0';
 import { useBaseQuoteTickOffset } from './useGetBaseQuoteTickOffset';
 
@@ -28,7 +28,7 @@ export type KandelInfo = {
 };
 
 export function useGetKandelInfo(kandelAddr: Address) {
-  const { staticParams } = useGetKandelStatisParams(kandelAddr);
+  const { staticParams } = useGetKandelStaticParams(kandelAddr);
   const { params } = useGetKandelParams(kandelAddr);
   const { baseQuoteTickOffset } = useBaseQuoteTickOffset(kandelAddr);
 

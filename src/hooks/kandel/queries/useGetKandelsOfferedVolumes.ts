@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react';
 import { useReadContracts } from 'wagmi';
 import { KandelABI } from '@/abi/kandel';
+import { QUERY_SCOPE_KEYS } from '@/lib/constants';
 import type { StoredKandel } from '../useKandels';
 
 type VolumesByKandel = Map<string, KandelOfferedVolume>;
@@ -36,6 +37,7 @@ export function useGetKandelsOfferedVolumes(kandels: StoredKandel[]) {
   const { data, isLoading } = useReadContracts({
     contracts,
     allowFailure: true,
+    scopeKey: QUERY_SCOPE_KEYS.OFFERED_VOLUMES,
     query: {
       enabled,
     },

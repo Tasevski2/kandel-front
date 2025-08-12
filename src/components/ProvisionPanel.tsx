@@ -1,6 +1,3 @@
-'use client';
-
-import { missingProvisionWei } from '@/lib/provision';
 import { formatEthAmount } from '../lib/formatting';
 
 interface ProvisionPanelProps {

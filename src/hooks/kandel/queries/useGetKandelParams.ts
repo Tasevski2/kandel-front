@@ -2,6 +2,7 @@ import { KandelABI } from '@/abi/kandel';
 import { useMemo } from 'react';
 import { Address } from 'viem';
 import { useReadContract } from 'wagmi';
+import { QUERY_SCOPE_KEYS } from '@/lib/constants';
 
 export type KandelParams = {
   gasprice: number;
@@ -11,10 +12,11 @@ export type KandelParams = {
 };
 
 export function useGetKandelParams(kandelAddr: Address) {
-  const { data, isLoading } = useReadContract({
+  const { data, isLoading, queryKey } = useReadContract({
     address: kandelAddr,
     abi: KandelABI,
     functionName: 'params',
+    scopeKey: QUERY_SCOPE_KEYS.PARAMS,
     query: {
       enabled: !!kandelAddr,
     },

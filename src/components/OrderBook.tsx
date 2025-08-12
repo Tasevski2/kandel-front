@@ -80,25 +80,7 @@ export function OrderBook({
           </h3>
           <div className='overflow-x-auto'>
             <table className='w-full text-sm'>
-              <thead>
-                <tr className='border-b border-white/10'>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Price
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Size
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Value
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Maker
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    ID
-                  </th>
-                </tr>
-              </thead>
+              <OrdersTableHeader />
               <tbody>
                 {bids && bids.length ? (
                   bids.map((bid) => (
@@ -129,25 +111,7 @@ export function OrderBook({
           </h3>
           <div className='overflow-x-auto'>
             <table className='w-full text-sm'>
-              <thead>
-                <tr className='border-b border-white/10'>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Price
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Size
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Value
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    Maker
-                  </th>
-                  <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-                    ID
-                  </th>
-                </tr>
-              </thead>
+              <OrdersTableHeader />
               <tbody>
                 {asks && asks.length ? (
                   asks.map((ask) => (
@@ -172,6 +136,30 @@ export function OrderBook({
         </div>
       </div>
     </div>
+  );
+}
+
+function OrdersTableHeader() {
+  return (
+    <thead>
+      <tr className='border-b border-white/10'>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
+          Price
+        </th>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
+          Size
+        </th>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
+          Value
+        </th>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
+          Maker
+        </th>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
+          ID
+        </th>
+      </tr>
+    </thead>
   );
 }
 

@@ -1,5 +1,3 @@
-'use client';
-
 import { type TokenInfo } from '../hooks/token/useTokenInfo';
 import { formatAddress } from '@/lib/formatting';
 

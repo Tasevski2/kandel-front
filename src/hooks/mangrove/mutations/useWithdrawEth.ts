@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useConfig, useWriteContract } from 'wagmi';
 import { readContract, waitForTransactionReceipt } from '@wagmi/core';
 import { KandelABI } from '@/abi/kandel';
 import { MangroveABI } from '@/abi/mangrove';
 import { ADDRESSES } from '@/lib/addresses';
-import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
-import { config } from '@/config/wagmiConfig';
+import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
+import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 
 interface WithdrawEthParams {
   kandelAddr: Address;
@@ -15,6 +15,9 @@ interface WithdrawEthParams {
 }
 
 export function useWithdrawEth() {
+  const config = useConfig();
+  const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,13 +45,15 @@ export function useWithdrawEth() {
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'withdrawFromMangrove',
-        args: [balance, recipient || kandelAddr], // Default to contract address if no recipient
+        args: [balance, recipient || kandelAddr],
       });
 
       const receipt = await waitForTransactionReceipt(config, {
         hash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      await invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BALANCE_OF);
 
       return receipt;
     } catch (error) {

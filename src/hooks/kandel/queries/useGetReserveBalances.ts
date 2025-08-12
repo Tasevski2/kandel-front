@@ -3,6 +3,7 @@
 import { useReadContracts } from 'wagmi';
 import type { Address } from 'viem';
 import { KandelABI } from '@/abi/kandel';
+import { QUERY_SCOPE_KEYS } from '@/lib/constants';
 
 export function useGetReserveBalances(kandelAddr?: Address) {
   const enabled = Boolean(kandelAddr);
@@ -25,6 +26,7 @@ export function useGetReserveBalances(kandelAddr?: Address) {
           },
         ],
     allowFailure: false,
+    scopeKey: QUERY_SCOPE_KEYS.RESERVE_BALANCES,
     query: {
       enabled,
     },

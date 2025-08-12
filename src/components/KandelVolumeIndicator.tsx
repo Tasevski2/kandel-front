@@ -48,7 +48,7 @@ export function KandelVolumeIndicator({
   }
 
   // Format volumes for display using correct token decimals
-  // askVolume uses base token decimals, bidVolume uses quote token decimals
+  // askVolume uses base token decimals, bidVolume uses quote token decimalss
   const askVolumeFormatted = Number(
     formatUnits(volumeData.askVolume, baseTokenInfo.decimals)
   );

@@ -122,7 +122,6 @@ export function KandelForm(props: KandelFormProps) {
           <p className='text-red-400 text-sm mt-2'>{status.priceRangeError}</p>
         )}
       </div>
-
       {/* Advanced Parameters Card */}
       <div className='card'>
         <h3 className='text-lg font-semibold text-slate-200 mb-4'>
@@ -168,7 +167,6 @@ export function KandelForm(props: KandelFormProps) {
           </div>
         </div>
       </div>
-
       {/* Initial Inventory Card */}
       <div className='card'>
         <h3 className='text-lg font-semibold text-slate-200 mb-4'>
@@ -287,7 +285,6 @@ export function KandelForm(props: KandelFormProps) {
           <p className='text-red-400 text-sm mt-2'>{status.minVolumeError}</p>
         )}
       </div>
-
       {/* Advanced Settings Card */}
       <div className='card'>
         <h3 className='text-lg font-semibold text-slate-200 mb-4'>
@@ -310,7 +307,6 @@ export function KandelForm(props: KandelFormProps) {
           </div>
         </div>
       </div>
-
       {/* Provision Summary Card */}
       <div className='card'>
         <h3 className='text-lg font-semibold text-slate-200 mb-4'>
@@ -327,41 +323,31 @@ export function KandelForm(props: KandelFormProps) {
           </div>
         </div>
       </div>
-
       {/* Error display */}
       {status.error && (
         <div className='bg-red-500/20 border border-red-500/50 rounded-lg p-4'>
           <p className='text-red-400'>{status.error}</p>
         </div>
       )}
-
       {/* Submit button */}
-      {(() => {
-        const hasAnyChanges =
-          computed.dirty && Object.values(computed.dirty).some(Boolean);
-
-        return (
-          <button
-            type='submit'
-            disabled={
-              status.loading ||
-              parseInt(formState.levelsPerSide) === 0 ||
-              status.stepSizeError !== null ||
-              status.minVolumeError !== null ||
-              status.priceRangeError !== null ||
-              status.gasreqError !== null ||
-              (computed.isEditing && !hasAnyChanges)
-            }
-            className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
-          >
-            {status.loading
-              ? 'Processing...'
-              : computed.kandelAddress
-              ? 'Update Kandel'
-              : 'Create Kandel'}
-          </button>
-        );
-      })()}
+      <button
+        type='submit'
+        disabled={
+          status.loading ||
+          parseInt(formState.levelsPerSide) === 0 ||
+          status.stepSizeError !== null ||
+          status.minVolumeError !== null ||
+          status.priceRangeError !== null ||
+          status.gasreqError !== null
+        }
+        className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
+      >
+        {status.loading
+          ? 'Processing...'
+          : computed.kandelAddress
+          ? 'Update Kandel'
+          : 'Create Kandel'}
+      </button>
     </form>
   );
 }

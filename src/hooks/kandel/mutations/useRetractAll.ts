@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useConfig, useWriteContract } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { KandelABI } from '@/abi/kandel';
-import { config } from '@/config/wagmiConfig';
-import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
+import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
 import { useWithdrawEth } from '../../mangrove/mutations/useWithdrawEth';
+import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 
 interface RetractAllParams {
   kandelAddr: Address;
@@ -14,13 +14,15 @@ interface RetractAllParams {
 }
 
 export function useRetractAll() {
+  const config = useConfig();
+  const { invalidateQueriesByScopeKey } = useInvalidateQueries();
   const { writeContractAsync } = useWriteContract();
   const { withdrawEth } = useWithdrawEth();
   const [isLoading, setIsLoading] = useState(false);
 
   const retractAll = async (params: RetractAllParams) => {
     const { kandelAddr, pricePoints, deprovision } = params;
-    
+
     setIsLoading(true);
     try {
       const hash = await writeContractAsync({
@@ -35,7 +37,14 @@ export function useRetractAll() {
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
 
-      // If deprovisioning is requested, also withdraw ETH provisions
+      await Promise.all([
+        invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.PARAMS),
+        invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BASE_QUOTE_TICK_OFFSET),
+        invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.OFFERED_VOLUMES, true),
+        invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BALANCE_OF),
+        invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.OFFER_LIST),
+      ]);
+
       if (deprovision) {
         await withdrawEth({ kandelAddr });
       }
