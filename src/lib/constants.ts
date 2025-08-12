@@ -19,3 +19,6 @@ export const MAX_UINT256 = BigInt(
 );
 export const MAX_UINT24 = 16777215;
 export const MAX_UINT32 = 4294967295;
+
+// Transaction confirmation settings
+export const TRANSACTION_CONFIRMATIONS = 1;

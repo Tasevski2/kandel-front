@@ -180,7 +180,11 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await withdrawToken({ kandelAddr: kandelAddress, tokenType: 'base', recipient: userAddress });
+      await withdrawToken({
+        kandelAddr: kandelAddress,
+        tokenType: 'base',
+        recipient: userAddress,
+      });
 
       // await fetchData();
     } catch (error) {
@@ -194,7 +198,11 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await withdrawToken({ kandelAddr: kandelAddress, tokenType: 'quote', recipient: userAddress });
+      await withdrawToken({
+        kandelAddr: kandelAddress,
+        tokenType: 'quote',
+        recipient: userAddress,
+      });
 
       // await fetchData();
     } catch (error) {
@@ -437,7 +445,11 @@ export default function KandelDetailPage({ params }: PageProps) {
                       >
                         Edit Position
                       </button>
-                      <button onClick={handleRetract} className='btn-danger'>
+                      <button 
+                        onClick={handleRetract} 
+                        className='btn-danger'
+                        disabled={nLiveOffers === 0}
+                      >
                         Retract All Offers
                       </button>
                       <button

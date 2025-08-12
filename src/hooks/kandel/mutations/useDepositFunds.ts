@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useWriteContract } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import type { Address } from 'viem';
 import { KandelABI } from '@/abi/kandel';
+import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
+import { config } from '@/config/wagmiConfig';
 import { useErc20Approve } from '../../token/useErc20Approve';
 
 type DepositFundsArgs = {
@@ -31,12 +34,19 @@ export function useDepositFunds() {
       await erc20Approve(baseToken, kandel, baseAmount);
       await erc20Approve(quoteToken, kandel, quoteAmount);
 
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: kandel,
         abi: KandelABI,
         functionName: 'depositFunds',
         args: [baseAmount, quoteAmount],
       });
+
+      const receipt = await waitForTransactionReceipt(config, {
+        hash,
+        confirmations: TRANSACTION_CONFIRMATIONS,
+      });
+
+      return receipt;
     } catch (error) {
       throw error;
     } finally {

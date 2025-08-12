@@ -8,6 +8,7 @@ import { usePopulateFromOffset } from '@/hooks/kandel/mutations/usePopulateFromO
 import { useProvision } from '@/hooks/mangrove/queries/useProvision';
 import { useGetLocalConfigs } from '@/hooks/mangrove/queries/useGetLocalConfigs';
 import { useGetReserveBalances } from '@/hooks/kandel/queries/useGetReserveBalances';
+import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
 import { useTokensInfo } from '@/hooks/token/useTokenInfo';
 import type { KandelInfo } from '@/hooks/kandel/queries/useGetKandelInfo';
 import {
@@ -22,7 +23,7 @@ import {
   type MarketParams,
 } from '@mangrovedao/mgv';
 import { maxPriceToTick, minPriceToTick, parseAmount } from '@/lib/pricing';
-import { formatEthAmount, formatTokenAmount } from '@/lib/formatting';
+import { formatTokenAmount } from '@/lib/formatting';
 import { minGivesUnits, missingProvisionWei } from '@/lib/provision';
 import type { Market } from '@/hooks/mangrove/queries/useGetMarkets';
 import {
@@ -275,6 +276,16 @@ export function useKandelForm(props: KandelFormProps) {
       tickSpacing,
       gasreq: gasreqNumber,
     });
+
+  // Get current order book for the Kandel (only in edit mode to check for live offers)
+  const { asks, bids } = useGetOrderBook({
+    base: baseTokenInfo?.address,
+    quote: quoteTokenInfo?.address,
+    baseDec: baseTokenInfo?.decimals,
+    quoteDec: quoteTokenInfo?.decimals,
+    tickSpacing,
+    maker: kandelAddress,
+  });
 
   // Helper function to filter numeric input for price fields
   const handlePriceChange = (
@@ -787,10 +798,22 @@ export function useKandelForm(props: KandelFormProps) {
           quote,
           tickSpacing,
         });
-      } else if (isEditing) {
-        // Always retract all offers when editing to ensure fresh, up-to-date offers
-        const pricePoints = parseInt(levelsPerSide) * 2;
-        await retractAll({ kandelAddr: address!, pricePoints, deprovision: false });
+      } else if (isEditing && kandelInfo) {
+        // Only retract if there are live offers to retract
+        const contractPricePoints = kandelInfo.levelsPerSide * 2;
+
+        // Check if we have live offers
+        const hasLiveOffers =
+          (asks && asks.length > 0) || (bids && bids.length > 0);
+
+        if (hasLiveOffers) {
+          // Retract all existing offers using the contract's current levelsPerSide
+          await retractAll({
+            kandelAddr: address!,
+            pricePoints: contractPricePoints,
+            deprovision: false,
+          });
+        }
       }
 
       const baseTokenDec = baseTokenInfo.decimals;

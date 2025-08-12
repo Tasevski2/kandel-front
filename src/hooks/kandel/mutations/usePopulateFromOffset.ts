@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { useWriteContract } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import { KandelABI } from '@/abi/kandel';
-import { Address } from 'viem';
+import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
+import { config } from '@/config/wagmiConfig';
+import type { Address } from 'viem';
 
 export interface PopulateFromOffsetParams {
   kandelAddr: Address;
@@ -23,38 +27,51 @@ export interface PopulateFromOffsetParams {
 }
 
 export function usePopulateFromOffset() {
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
+  const [isLoading, setIsLoading] = useState(false);
 
   const populateFromOffset = async (params: PopulateFromOffsetParams) => {
-    const hash = await writeContractAsync({
-      address: params.kandelAddr,
-      abi: KandelABI,
-      functionName: 'populateFromOffset',
-      args: [
-        params.from,
-        params.to,
-        params.minTick,
-        params.tickOffsetBetweenLevels,
-        params.firstAskIndex,
-        params.bidGivesPerLevel,
-        params.askGivesPerLevel,
-        {
-          gasprice: params.params.gasprice,
-          gasreq: params.params.gasreq,
-          stepSize: params.params.stepSize,
-          pricePoints: params.params.pricePoints,
-        },
-        params.baseAmount,
-        params.quoteAmount,
-      ],
-      value: params.provisionValue,
-    });
+    setIsLoading(true);
+    try {
+      const hash = await writeContractAsync({
+        address: params.kandelAddr,
+        abi: KandelABI,
+        functionName: 'populateFromOffset',
+        args: [
+          params.from,
+          params.to,
+          params.minTick,
+          params.tickOffsetBetweenLevels,
+          params.firstAskIndex,
+          params.bidGivesPerLevel,
+          params.askGivesPerLevel,
+          {
+            gasprice: params.params.gasprice,
+            gasreq: params.params.gasreq,
+            stepSize: params.params.stepSize,
+            pricePoints: params.params.pricePoints,
+          },
+          params.baseAmount,
+          params.quoteAmount,
+        ],
+        value: params.provisionValue,
+      });
 
-    return hash;
+      const receipt = await waitForTransactionReceipt(config, {
+        hash,
+        confirmations: TRANSACTION_CONFIRMATIONS,
+      });
+
+      return receipt;
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return {
     populateFromOffset,
-    isLoading: isPending,
+    isLoading,
   };
 }
