@@ -46,10 +46,11 @@ export default function KandelDetailPage({ params }: PageProps) {
 
   const { setStepSize } = useSetStepSize();
   const { setGasReq } = useSetGasReq();
-  const { retractAll } = useRetractAll();
-  const { withdrawEth } = useWithdrawEth();
-  const { withdrawToken } = useWithdrawToken();
-  const { retractAndWithdrawAll } = useRetractAndWithdrawAll();
+  const { retractAll, isLoading: isRetracting } = useRetractAll();
+  const { withdrawEth, isLoading: isWithdrawingEth } = useWithdrawEth();
+  const { withdrawToken, isLoading: isWithdrawingToken } = useWithdrawToken();
+  const { retractAndWithdrawAll, isLoading: isShuttingDown } =
+    useRetractAndWithdrawAll();
   const { kandelInfo } = useGetKandelInfo(kandelAddress);
 
   const [showEditForm, setShowEditForm] = useState(false);
@@ -445,33 +446,50 @@ export default function KandelDetailPage({ params }: PageProps) {
                       >
                         Edit Position
                       </button>
-                      <button 
-                        onClick={handleRetract} 
+                      <button
+                        onClick={handleRetract}
                         className='btn-danger'
-                        disabled={nLiveOffers === 0}
+                        disabled={nLiveOffers === 0 || isRetracting}
                       >
-                        Retract All Offers
+                        {isRetracting ? 'Retracting...' : 'Retract All Offers'}
                       </button>
                       <button
                         onClick={handleWithdrawEth}
                         className='btn-secondary'
-                        disabled={freeBalance === BigInt(0)}
+                        disabled={freeBalance === BigInt(0) || isWithdrawingEth}
                       >
-                        Withdraw ETH
+                        {isWithdrawingEth ? 'Withdrawing...' : 'Withdraw ETH'}
                       </button>
                       <button
                         onClick={handleWithdrawBaseToken}
                         className='btn-secondary'
-                        disabled={baseReserveBalance === BigInt(0)}
+                        disabled={
+                          baseReserveBalance === BigInt(0) || isWithdrawingToken
+                        }
                       >
-                        Withdraw <TokenDisplay tokenInfo={baseTokenInfo} />
+                        {isWithdrawingToken ? (
+                          'Withdrawing...'
+                        ) : (
+                          <>
+                            Withdraw <TokenDisplay tokenInfo={baseTokenInfo} />
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={handleWithdrawQuoteToken}
                         className='btn-secondary'
-                        disabled={quoteReserveBalance === BigInt(0)}
+                        disabled={
+                          quoteReserveBalance === BigInt(0) ||
+                          isWithdrawingToken
+                        }
                       >
-                        Withdraw <TokenDisplay tokenInfo={quoteTokenInfo} />
+                        {isWithdrawingToken ? (
+                          'Withdrawing...'
+                        ) : (
+                          <>
+                            Withdraw <TokenDisplay tokenInfo={quoteTokenInfo} />
+                          </>
+                        )}
                       </button>
                       {calculatedProvisions.missing > BigInt(0) && (
                         <button
@@ -486,8 +504,11 @@ export default function KandelDetailPage({ params }: PageProps) {
                       <button
                         onClick={handleCompleteShutdown}
                         className='btn-danger col-span-2'
+                        disabled={isShuttingDown}
                       >
-                        Complete Shutdown & Withdraw All
+                        {isShuttingDown
+                          ? 'Shutting down...'
+                          : 'Complete Shutdown & Withdraw All'}
                       </button>
                     </div>
                   </div>
