@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { TokenDisplay } from './TokenDisplay';
-import { useTokens } from '../hooks/useTokens';
-import { useKandel } from '../hooks/useKandel';
 import { parseAmount } from '../lib/pricing';
-import { TokenInfo } from '../hooks/useTokenInfo';
-import { useMangrove } from '@/hooks/useMangrove';
+import { TokenInfo } from '../hooks/token/useTokenInfo';
+import type { Address } from 'viem';
+import { useDepositFunds } from '@/hooks/kandel/mutations/useDepositFunds';
+import { useFundMaker } from '@/hooks/mangrove/mutations/useFundMaker';
 
 interface KandelDepositPanelProps {
-  kandelAddress: `0x${string}`;
+  kandelAddress: Address;
   baseTokenInfo: TokenInfo;
   quoteTokenInfo: TokenInfo;
 }
@@ -21,26 +21,22 @@ export function KandelDepositPanel({
   quoteTokenInfo,
 }: KandelDepositPanelProps) {
   const { address: userAddress } = useAccount();
-  const { erc20Approve } = useTokens();
-  const kandel = useKandel(kandelAddress);
-  const { fundMaker } = useMangrove();
+  const { depositFunds, isLoading: isLoadingTokenDeposit } = useDepositFunds();
+  const { fundMaker, isLoading: isLoadingEthDeposit } = useFundMaker();
 
   const [baseDepositAmount, setBaseDepositAmount] = useState('');
   const [quoteDepositAmount, setQuoteDepositAmount] = useState('');
   const [ethDepositAmount, setEthDepositAmount] = useState('');
 
-  const [tokenDepositLoading, setTokenDepositLoading] = useState(false);
-  const [ethDepositLoading, setEthDepositLoading] = useState(false);
-
   const { data: baseBalance } = useBalance({
     address: userAddress,
-    token: baseTokenInfo.address as `0x${string}`,
+    token: baseTokenInfo.address as Address,
     query: { enabled: !!userAddress },
   });
 
   const { data: quoteBalance } = useBalance({
     address: userAddress,
-    token: quoteTokenInfo.address as `0x${string}`,
+    token: quoteTokenInfo.address as Address,
     query: { enabled: !!userAddress },
   });
 
@@ -116,44 +112,19 @@ export function KandelDepositPanel({
       return;
     }
 
-    setTokenDepositLoading(true);
     try {
-      if (baseAmount > BigInt(0)) {
-        await erc20Approve(
-          baseTokenInfo.address as `0x${string}`,
-          kandelAddress,
-          baseAmount
-        );
-      }
-      if (quoteAmount > BigInt(0)) {
-        await erc20Approve(
-          quoteTokenInfo.address as `0x${string}`,
-          kandelAddress,
-          quoteAmount
-        );
-      }
-
-      if (baseAmount > BigInt(0)) {
-        await kandel.depositFunds(
-          baseTokenInfo.address as `0x${string}`,
-          baseAmount,
-          userAddress
-        );
-      }
-      if (quoteAmount > BigInt(0)) {
-        await kandel.depositFunds(
-          quoteTokenInfo.address as `0x${string}`,
-          quoteAmount,
-          userAddress
-        );
-      }
+      await depositFunds({
+        kandel: kandelAddress,
+        baseToken: baseTokenInfo.address,
+        quoteToken: quoteTokenInfo.address,
+        baseAmount,
+        quoteAmount,
+      });
 
       setBaseDepositAmount('');
       setQuoteDepositAmount('');
     } catch (error) {
       console.error('Failed to deposit tokens:', error);
-    } finally {
-      setTokenDepositLoading(false);
     }
   };
 
@@ -178,15 +149,12 @@ export function KandelDepositPanel({
       return;
     }
 
-    setEthDepositLoading(true);
     try {
       await fundMaker(kandelAddress, amountWei);
 
       setEthDepositAmount('');
     } catch (error) {
       console.error('Failed to deposit ETH:', error);
-    } finally {
-      setEthDepositLoading(false);
     }
   };
 
@@ -200,8 +168,7 @@ export function KandelDepositPanel({
         <div className='grid grid-cols-2 gap-4'>
           <div>
             <label className='label text-sm'>
-              <TokenDisplay address={baseTokenInfo.address as `0x${string}`} />{' '}
-              Amount
+              <TokenDisplay tokenInfo={baseTokenInfo} /> Amount
             </label>
             <input
               type='text'
@@ -209,13 +176,12 @@ export function KandelDepositPanel({
               onChange={(e) => setBaseDepositAmount(e.target.value)}
               placeholder='0.0'
               className='input'
-              disabled={tokenDepositLoading || ethDepositLoading}
+              disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
           </div>
           <div>
             <label className='label text-sm'>
-              <TokenDisplay address={quoteTokenInfo.address as `0x${string}`} />{' '}
-              Amount
+              <TokenDisplay tokenInfo={quoteTokenInfo} /> Amount
             </label>
             <input
               type='text'
@@ -223,7 +189,7 @@ export function KandelDepositPanel({
               onChange={(e) => setQuoteDepositAmount(e.target.value)}
               placeholder='0.0'
               className='input'
-              disabled={tokenDepositLoading || ethDepositLoading}
+              disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
           </div>
         </div>
@@ -231,11 +197,11 @@ export function KandelDepositPanel({
         <button
           onClick={handleTokenDeposit}
           disabled={
-            tokenDepositLoading || (!baseDepositAmount && !quoteDepositAmount)
+            isLoadingTokenDeposit || (!baseDepositAmount && !quoteDepositAmount)
           }
           className='btn-primary w-full disabled:opacity-50'
         >
-          {tokenDepositLoading ? 'Depositing...' : 'Deposit Tokens'}
+          {isLoadingTokenDeposit ? 'Depositing...' : 'Deposit Tokens'}
         </button>
 
         <div className='border-t border-slate-600 pt-4'>
@@ -247,16 +213,16 @@ export function KandelDepositPanel({
               onChange={(e) => setEthDepositAmount(e.target.value)}
               placeholder='0.0'
               className='input'
-              disabled={tokenDepositLoading || ethDepositLoading}
+              disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
           </div>
 
           <button
             onClick={handleEthDeposit}
-            disabled={ethDepositLoading || !ethDepositAmount}
+            disabled={isLoadingEthDeposit || !ethDepositAmount}
             className='btn-secondary w-full mt-2 disabled:opacity-50'
           >
-            {ethDepositLoading ? 'Depositing...' : 'Deposit ETH'}
+            {isLoadingEthDeposit ? 'Depositing...' : 'Deposit ETH'}
           </button>
         </div>
       </div>

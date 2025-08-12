@@ -1,6 +1,6 @@
 'use client';
 
-import { useProvision } from '../hooks/useProvision';
+import { missingProvisionWei } from '@/lib/provision';
 import { formatEthAmount } from '../lib/formatting';
 
 interface ProvisionPanelProps {
@@ -8,11 +8,12 @@ interface ProvisionPanelProps {
   offerGasbase: bigint;
   gasreq: bigint;
   nOffers: bigint;
+  totalProvisionNeeded: bigint;
   lockedProvision: bigint;
+  missingProvision: bigint;
   freeBalance: bigint;
   perAskProvision: bigint;
   perBidProvision: bigint;
-  totalProvisionNeeded: bigint;
 }
 
 export function ProvisionPanel({
@@ -20,20 +21,13 @@ export function ProvisionPanel({
   offerGasbase,
   gasreq,
   nOffers,
+  totalProvisionNeeded,
   lockedProvision,
+  missingProvision,
   freeBalance,
   perAskProvision,
   perBidProvision,
-  totalProvisionNeeded,
 }: ProvisionPanelProps) {
-  const { missing } = useProvision();
-
-  const missingProvision = missing(
-    totalProvisionNeeded,
-    lockedProvision,
-    freeBalance
-  );
-
   return (
     <div className='card'>
       <h3 className='text-lg font-semibold text-slate-200 mb-4'>

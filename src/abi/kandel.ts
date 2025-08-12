@@ -1,4 +1,6 @@
-export const KandelABI = [
+import { Abi } from 'viem';
+
+export const KandelABI: Abi = [
   {
     type: 'constructor',
     inputs: [

@@ -2,14 +2,14 @@
 
 import { useMemo } from 'react';
 import { formatTokenAmount } from '../lib/formatting';
-import { useTokensInfo } from '../hooks/useTokenInfo';
+import { TokenInfo, useTokensInfo } from '../hooks/token/useTokenInfo';
 
 interface InventoryCardProps {
   baseQty: bigint;
   quoteQty: bigint;
-  liveOffers: number;
-  baseToken: `0x${string}`;
-  quoteToken: `0x${string}`;
+  nOffers: number;
+  baseTokenInfo?: TokenInfo;
+  quoteTokenInfo?: TokenInfo;
   baseSymbol?: string;
   quoteSymbol?: string;
 }
@@ -17,24 +17,12 @@ interface InventoryCardProps {
 export function InventoryCard({
   baseQty,
   quoteQty,
-  liveOffers,
-  baseToken,
-  quoteToken,
+  nOffers,
+  baseTokenInfo,
+  quoteTokenInfo,
   baseSymbol,
   quoteSymbol,
 }: InventoryCardProps) {
-  // Memoize token addresses to prevent infinite re-renders
-  const tokenAddresses = useMemo(
-    () => [baseToken, quoteToken],
-    [baseToken, quoteToken]
-  );
-
-  // Fetch token info from blockchain
-  const { tokensInfo, loading } = useTokensInfo(tokenAddresses);
-
-  const baseTokenInfo = tokensInfo[0];
-  const quoteTokenInfo = tokensInfo[1];
-
   // Use provided symbols or get from fetched token info
   const finalBaseSymbol = baseSymbol || baseTokenInfo?.symbol || 'Loading...';
   const finalQuoteSymbol =
@@ -51,7 +39,7 @@ export function InventoryCard({
         <div className='grid grid-cols-2 gap-4'>
           <div className='bg-white/5 rounded-lg p-4'>
             <p className='text-sm text-slate-400 mb-1'>
-              {loading && !baseTokenInfo ? (
+              {!baseTokenInfo ? (
                 <span className='animate-pulse'>Loading...</span>
               ) : (
                 `${finalBaseSymbol} Balance`
@@ -64,7 +52,7 @@ export function InventoryCard({
 
           <div className='bg-white/5 rounded-lg p-4'>
             <p className='text-sm text-slate-400 mb-1'>
-              {loading && !quoteTokenInfo ? (
+              {!quoteTokenInfo ? (
                 <span className='animate-pulse'>Loading...</span>
               ) : (
                 `${finalQuoteSymbol} Balance`
@@ -78,7 +66,7 @@ export function InventoryCard({
 
         <div className='bg-white/5 rounded-lg p-4'>
           <p className='text-sm text-slate-400 mb-1'>Live Offers</p>
-          <p className='text-xl font-semibold text-green-400'>{liveOffers}</p>
+          <p className='text-xl font-semibold text-green-400'>{nOffers}</p>
         </div>
       </div>
     </div>

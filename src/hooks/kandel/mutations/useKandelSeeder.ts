@@ -1,20 +1,20 @@
-import { useWriteContract } from 'wagmi';
+import { useConfig, useWriteContract } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
-import { parseEventLogs } from 'viem';
-import { kandelSeederABI } from '../abi/kandelSeeder';
-import { ADDRESSES } from '../lib/addresses';
-import { config } from './useChain';
+import { type Address, parseEventLogs } from 'viem';
+import { kandelSeederABI } from '@/abi/kandelSeeder';
+import { ADDRESSES } from '@/lib/addresses';
 
 interface CreateParams {
-  base: `0x${string}`;
-  quote: `0x${string}`;
+  base: Address;
+  quote: Address;
   tickSpacing: bigint;
 }
 
 export function useKandelSeeder() {
+  const config = useConfig();
   const { writeContractAsync } = useWriteContract();
 
-  const create = async (params: CreateParams): Promise<`0x${string}`> => {
+  const create = async (params: CreateParams): Promise<Address> => {
     const hash = await writeContractAsync({
       address: ADDRESSES.kandelSeeder,
       abi: kandelSeederABI,
@@ -25,11 +25,10 @@ export function useKandelSeeder() {
           inbound_tkn: params.quote,
           tickSpacing: params.tickSpacing,
         },
-        false, // liquiditySharing
+        false,
       ],
     });
 
-    // Wait for transaction and extract Kandel address from events
     const receipt = await waitForTransactionReceipt(config, { hash });
 
     if (!receipt) throw new Error('Transaction failed');
@@ -44,7 +43,7 @@ export function useKandelSeeder() {
       throw new Error('Kandel creation failed - no address in events');
     }
 
-    return sowEvent.args.kandel as `0x${string}`;
+    return sowEvent.args.kandel as Address;
   };
 
   return { create };

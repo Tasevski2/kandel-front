@@ -1,3 +1,4 @@
+import { Address } from 'viem';
 import { isDevelopment } from '../config/networks';
 import anvilDeployment from './deployments/anvil.json';
 import baseDeployment from './deployments/base.json';
@@ -6,9 +7,9 @@ export interface DeploymentConfig {
   chainId: number;
   chainName: string;
   contracts: {
-    mangrove: `0x${string}`;
-    mgvReader: `0x${string}`;
-    kandelSeeder: `0x${string}`;
+    mangrove: Address;
+    mgvReader: Address;
+    kandelSeeder: Address;
   };
 }
 
@@ -24,15 +25,15 @@ export function getDeployment(): DeploymentConfig {
   }
 
   const deployment = isDevelopment() ? anvilDeployment : baseDeployment;
-  
+
   // Validate and type-cast the deployment
   cachedDeployment = {
     chainId: deployment.chainId,
     chainName: deployment.chainName,
     contracts: {
-      mangrove: deployment.contracts.mangrove as `0x${string}`,
-      mgvReader: deployment.contracts.mgvReader as `0x${string}`,
-      kandelSeeder: deployment.contracts.kandelSeeder as `0x${string}`,
+      mangrove: deployment.contracts.mangrove as Address,
+      mgvReader: deployment.contracts.mgvReader as Address,
+      kandelSeeder: deployment.contracts.kandelSeeder as Address,
     },
   };
 

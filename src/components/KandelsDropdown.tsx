@@ -1,42 +1,40 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { TokenPairDisplay } from './TokenDisplay';
-import { useKandelOfferedVolume } from '../hooks/useKandelOfferedVolume';
+import { useGetKandelsOfferedVolumes } from '@/hooks/kandel/queries/useGetKandelsOfferedVolumes';
 import { KandelVolumeIndicator } from './KandelVolumeIndicator';
-import { useTokensInfo } from '../hooks/useTokenInfo';
-import type { StoredKandel } from '../hooks/useKandels';
+import { useTokensInfo } from '../hooks/token/useTokenInfo';
+import type { StoredKandel } from '../hooks/kandel/useKandels';
 import { KANDEL_LABELS } from '../lib/ui-constants';
+import { Address } from 'viem';
 
 interface KandelsDropdownProps {
   kandels: StoredKandel[];
-  loading?: boolean;
+  isLoading?: boolean;
   placeholder?: string;
 }
 
 export function KandelsDropdown({
   kandels,
-  loading = false,
+  isLoading = false,
   placeholder = KANDEL_LABELS.yourKandels,
 }: KandelsDropdownProps) {
   const router = useRouter();
-  const { getOfferedVolume } = useKandelOfferedVolume(kandels);
+  const { getOfferedVolume, isLoading: isLoadingOfferedVolumes } =
+    useGetKandelsOfferedVolumes(kandels);
 
-  // Get all unique token addresses from kandels
-  const allTokenAddresses = kandels.reduce(
-    (addresses: (`0x${string}` | undefined)[], kandel) => {
-      addresses.push(
-        kandel.baseToken as `0x${string}`,
-        kandel.quoteToken as `0x${string}`
-      );
-      return addresses;
-    },
-    []
+  const tokenAddresses = useMemo(
+    () =>
+      kandels.reduce((addresses, kandel) => {
+        addresses.push(kandel.baseToken, kandel.quoteToken);
+        return addresses;
+      }, [] as Address[]),
+    [kandels]
   );
-  const uniqueTokenAddresses = [...new Set(allTokenAddresses.filter(Boolean))];
 
-  const { tokensInfo } = useTokensInfo(uniqueTokenAddresses);
+  const { tokensInfo } = useTokensInfo(tokenAddresses);
 
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,7 +73,7 @@ export function KandelsDropdown({
     setSearchTerm('');
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className='relative'>
         <div className='input flex items-center justify-between cursor-not-allowed opacity-50'>
@@ -91,7 +89,7 @@ export function KandelsDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className='input flex items-center justify-between w-full text-left hover:bg-slate-700/50 transition-colors'
-        disabled={loading}
+        disabled={isLoading}
       >
         <span className='text-slate-200'>
           <div className='flex items-center gap-2'>
@@ -161,21 +159,13 @@ export function KandelsDropdown({
                     <div className='flex flex-col gap-1'>
                       <div className='flex items-center justify-between w-full gap-2'>
                         <TokenPairDisplay
-                          baseAddress={kandel.baseToken as `0x${string}`}
-                          quoteAddress={kandel.quoteToken as `0x${string}`}
+                          baseTokenInfo={tokensInfo[kandel.baseToken]}
+                          quoteTokenInfo={tokensInfo[kandel.quoteToken]}
                         />
                         {(() => {
                           // Find token info for this kandel
-                          const baseTokenInfo = tokensInfo.find(
-                            (t) =>
-                              t?.address.toLowerCase() ===
-                              kandel.baseToken.toLowerCase()
-                          );
-                          const quoteTokenInfo = tokensInfo.find(
-                            (t) =>
-                              t?.address.toLowerCase() ===
-                              kandel.quoteToken.toLowerCase()
-                          );
+                          const baseTokenInfo = tokensInfo[kandel.baseToken];
+                          const quoteTokenInfo = tokensInfo[kandel.quoteToken];
 
                           // Only show volume indicator if we have token info
                           if (baseTokenInfo && quoteTokenInfo) {
@@ -183,6 +173,7 @@ export function KandelsDropdown({
                               <KandelVolumeIndicator
                                 kandelAddress={kandel.address}
                                 getOfferedVolume={getOfferedVolume}
+                                isLoadingOfferedVolume={isLoadingOfferedVolumes}
                                 baseTokenInfo={baseTokenInfo}
                                 quoteTokenInfo={quoteTokenInfo}
                               />

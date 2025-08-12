@@ -3,22 +3,23 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Connect } from '@/components/ConnectWrapper';
-import { KandelForm } from '@/components/KandelForm';
+import { KandelForm } from '@/components/KandelForm/index';
 import { ChainGuard } from '@/components/ChainGuard';
 import { MarketDropdown } from '@/components/MarketDropdown';
 import { NoMarketsMessage } from '@/components/NoMarketsMessage';
-import { useMarkets } from '@/hooks/useMarkets';
-import { useKandels } from '@/hooks/useKandels';
-import type { Market } from '@/hooks/useMarkets';
+import { useGetMarkets } from '@/hooks/mangrove/queries/useGetMarkets';
+import { useKandels } from '@/hooks/kandel/useKandels';
+import type { Market } from '@/hooks/mangrove/queries/useGetMarkets';
 import { KANDEL_LABELS, MARKET_LABELS } from '../../../lib/ui-constants';
+import { Address } from 'viem';
 
 export default function NewKandelPage() {
   const router = useRouter();
-  const { markets, loading: marketsLoading, error } = useMarkets();
+  const { markets, isLoading: marketsLoading, error } = useGetMarkets();
   const { addKandel } = useKandels();
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
 
-  const handleSuccess = async (address: `0x${string}`) => {
+  const handleSuccess = async (address: Address) => {
     if (selectedMarket) {
       addKandel({
         address,
@@ -73,7 +74,7 @@ export default function NewKandelPage() {
                 markets={markets}
                 selectedMarket={selectedMarket}
                 onMarketSelect={setSelectedMarket}
-                loading={marketsLoading}
+                isLoading={marketsLoading}
                 placeholder='Choose a market to create your Kandel position'
                 allowEmpty={false}
               />

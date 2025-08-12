@@ -2,12 +2,13 @@
 
 import { formatUnits } from 'viem';
 import { formatAmount } from '../lib/formatting';
-import type { KandelOfferedVolume } from '../hooks/useKandelOfferedVolume';
-import type { TokenInfo } from '../hooks/useTokenInfo';
+import type { KandelOfferedVolume } from '@/hooks/kandel/queries/useGetKandelsOfferedVolumes';
+import type { TokenInfo } from '../hooks/token/useTokenInfo';
 
 interface KandelVolumeIndicatorProps {
   kandelAddress: string;
   getOfferedVolume: (address: string) => KandelOfferedVolume | undefined;
+  isLoadingOfferedVolume: boolean;
   baseTokenInfo: TokenInfo;
   quoteTokenInfo: TokenInfo;
 }
@@ -15,12 +16,13 @@ interface KandelVolumeIndicatorProps {
 export function KandelVolumeIndicator({
   kandelAddress,
   getOfferedVolume,
+  isLoadingOfferedVolume,
   baseTokenInfo,
   quoteTokenInfo,
 }: KandelVolumeIndicatorProps) {
   const volumeData = getOfferedVolume(kandelAddress);
 
-  if (volumeData?.loading) {
+  if (isLoadingOfferedVolume) {
     return (
       <div className='animate-spin rounded-full h-3 w-3 border border-slate-500 border-t-transparent' />
     );

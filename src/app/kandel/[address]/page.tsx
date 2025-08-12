@@ -1,6 +1,5 @@
 'use client';
-
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { Connect } from '@/components/ConnectWrapper';
@@ -8,17 +7,27 @@ import { OrderBook } from '@/components/OrderBook';
 import { ProvisionPanel } from '@/components/ProvisionPanel';
 import { InventoryCard } from '@/components/InventoryCard';
 import { KandelDepositPanel } from '@/components/KandelDepositPanel';
-import { KandelForm } from '@/components/KandelForm';
+import { KandelForm } from '@/components/KandelForm/index';
 import { ChainGuard } from '@/components/ChainGuard';
 import { InlineEditField } from '@/components/InlineEditField';
-import { KandelParams, useKandel } from '@/hooks/useKandel';
-import { useMangrove } from '@/hooks/useMangrove';
-import { useMgvReader } from '@/hooks/useMgvReader';
-import { useTokensInfo } from '@/hooks/useTokenInfo';
+import { useSetStepSize } from '@/hooks/kandel/mutations/useSetStepSize';
+import { useSetGasReq } from '@/hooks/kandel/mutations/useSetGasReq';
+import { useRetractAll } from '@/hooks/kandel/mutations/useRetractAll';
+import { useWithdrawEth } from '@/hooks/mangrove/mutations/useWithdrawEth';
+import { useWithdrawToken } from '@/hooks/kandel/mutations/useWithdrawToken';
+import { useRetractAndWithdrawAll } from '@/hooks/kandel/mutations/useRetractAndWithdrawAll';
 import { formatAmount, formatEthAmount } from '@/lib/formatting';
-import { useProvision } from '@/hooks/useProvision';
+import { useProvision } from '@/hooks/mangrove/queries/useProvision';
 import { TokenDisplay } from '@/components/TokenDisplay';
 import { validateGasreq, validateStepSize } from '@/lib/validation';
+import type { Address } from 'viem';
+import { missingProvisionWei } from '@/lib/provision';
+import { useGetMakerFreeBalance } from '@/hooks/mangrove/queries/useGetMakerFreeBalance';
+import { useGetReserveBalances } from '@/hooks/kandel/queries/useGetReserveBalances';
+import { useGetLocalConfigs } from '@/hooks/mangrove/queries/useGetLocalConfigs';
+import { useFundMaker } from '@/hooks/mangrove/mutations/useFundMaker';
+import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
+import { useGetKandelInfo } from '@/hooks/kandel/queries/useGetKandelInfo';
 
 interface PageProps {
   params: Promise<{
@@ -29,149 +38,108 @@ interface PageProps {
 export default function KandelDetailPage({ params }: PageProps) {
   const router = useRouter();
   const { address: userAddress } = useAccount();
+
   const resolvedParams = use(params);
-  const kandelAddress = resolvedParams.address as `0x${string}`;
+  const kandelAddress = resolvedParams.address as Address;
 
-  const kandel = useKandel(kandelAddress);
-  const { getLocalConfig, getMakerFreeBalance, fundMaker, getProvision } =
-    useMangrove();
-  const { getBook } = useMgvReader();
-  const { missing } = useProvision();
+  const { fundMaker, isLoading: isFundingProvision } = useFundMaker();
 
-  const [loading, setLoading] = useState(true);
+  const { setStepSize } = useSetStepSize();
+  const { setGasReq } = useSetGasReq();
+  const { retractAll } = useRetractAll();
+  const { withdrawEth } = useWithdrawEth();
+  const { withdrawToken } = useWithdrawToken();
+  const { retractAndWithdrawAll } = useRetractAndWithdrawAll();
+  const { kandelInfo } = useGetKandelInfo(kandelAddress);
+
   const [showEditForm, setShowEditForm] = useState(false);
-  const [kandelParams, setKandelParams] = useState<KandelParams>();
 
-  const { tokensInfo } = useTokensInfo(
-    kandelParams ? [kandelParams.base, kandelParams.quote] : []
-  );
-  const [baseTokenInfo, quoteTokenInfo] = tokensInfo || [null, null];
+  const baseTokenInfo = kandelInfo?.base;
+  const quoteTokenInfo = kandelInfo?.quote;
 
-  const [marketTickSpacing, setMarketTickSpacing] = useState<bigint>(BigInt(1));
-  const [inventory, setInventory] = useState({
-    baseQty: BigInt(0),
-    quoteQty: BigInt(0),
+  const { provision } = useProvision({
+    base: baseTokenInfo?.address,
+    quote: quoteTokenInfo?.address,
+    tickSpacing: kandelInfo?.tickSpacing,
+    gasreq: kandelInfo?.gasreq,
   });
-  const [liveOffers, setLiveOffers] = useState(0);
-  const [offerGasbase, setOfferGasbase] = useState(BigInt(0));
-  const [freeBalance, setFreeBalance] = useState(BigInt(0));
-  const [missingProvision, setMissingProvision] = useState(BigInt(0));
-  const [lockedProvision, setLockedProvision] = useState(BigInt(0));
-  const [perAskProvision, setPerAskProvision] = useState(BigInt(0));
-  const [perBidProvision, setPerBidProvision] = useState(BigInt(0));
-  const [totalProvisionNeeded, setTotalProvisionNeeded] = useState(BigInt(0));
 
-  const fetchData = useCallback(
-    async (showLoading?: boolean) => {
-      try {
-        setLoading(!!showLoading);
+  const { balanceWei: freeBalance } = useGetMakerFreeBalance(kandelAddress);
+  const { baseBalance: baseReserveBalance, quoteBalance: quoteReserveBalance } =
+    useGetReserveBalances(kandelAddress);
 
-        // First fetch params and tickSpacing
-        const [params, tickSpacing] = await Promise.all([
-          kandel.getParams(),
-          kandel.getTickSpacing(),
-        ]);
-        setMarketTickSpacing(tickSpacing);
+  const {
+    ask: { offerGasbase: askOfferGasbase },
+    bid: { offerGasbase: bidOfferGasbase },
+  } = useGetLocalConfigs({
+    base: baseTokenInfo?.address,
+    quote: quoteTokenInfo?.address,
+    tickSpacing: kandelInfo?.tickSpacing,
+  });
 
-        // Then fetch remaining data in parallel
-        const [inv, orderBook, fb] = await Promise.all([
-          kandel.getInventory(),
-          getBook(params.base, params.quote, tickSpacing, [kandelAddress]),
-          getMakerFreeBalance(kandelAddress),
-        ]);
+  const { asks, bids } = useGetOrderBook({
+    base: baseTokenInfo?.address,
+    quote: quoteTokenInfo?.address,
+    baseDec: baseTokenInfo?.decimals,
+    quoteDec: quoteTokenInfo?.decimals,
+    tickSpacing: kandelInfo?.tickSpacing,
+    maker: kandelAddress,
+  });
+  const nLiveOffers =
+    asks !== undefined && bids !== undefined ? asks.length + bids.length : 0; // helper for UI
 
-        // Count only this Kandel's offers
-        const kandelAsks = orderBook.asks.filter((o) => o.isMine).length;
-        const kandelBids = orderBook.bids.filter((o) => o.isMine).length;
-        const offers = kandelAsks + kandelBids;
+  const calculatedProvisions = useMemo(() => {
+    if (
+      provision?.perAsk === undefined ||
+      provision.perBid === undefined ||
+      freeBalance === undefined ||
+      asks === undefined ||
+      bids === undefined
+    ) {
+      return { totalNeeded: BigInt(0), locked: BigInt(0), missing: BigInt(0) };
+    }
 
-        setKandelParams(params);
-        setInventory(inv);
-        setLiveOffers(offers);
-        setFreeBalance(fb);
+    const totalNeeded =
+      provision.perAsk * BigInt(asks.length) +
+      provision.perBid * BigInt(bids.length);
+    const locked = totalNeeded;
+    const missing = missingProvisionWei(totalNeeded, locked, freeBalance);
 
-        // Fetch local config
-        const config = await getLocalConfig(
-          params.base,
-          params.quote,
-          tickSpacing
-        );
-        setOfferGasbase(config.offerGasbase);
-
-        // Calculate provision details using contract-based provision
-        // Get per-offer provision for both ask and bid sides
-        const [askProvision, bidProvision] = await Promise.all([
-          getProvision(
-            params.base,
-            params.quote,
-            tickSpacing,
-            BigInt(params.gasreq)
-          ),
-          getProvision(
-            params.quote,
-            params.base,
-            tickSpacing,
-            BigInt(params.gasreq)
-          ),
-        ]);
-
-        // For Kandel, assume equal distribution between asks and bids
-        const askOffers = Math.ceil(offers / 2);
-        const bidOffers = Math.floor(offers / 2);
-
-        const totalNeeded =
-          askProvision * BigInt(askOffers) + bidProvision * BigInt(bidOffers);
-        const lockedAmount = totalNeeded; // All needed provision should be locked for active offers
-        const missingAmount = missing(totalNeeded, lockedAmount, fb);
-
-        setPerAskProvision(askProvision);
-        setPerBidProvision(bidProvision);
-        setTotalProvisionNeeded(totalNeeded);
-        setLockedProvision(lockedAmount);
-        setMissingProvision(missingAmount);
-      } catch (error) {
-        console.error('Failed to fetch Kandel data:', error);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [kandelAddress]
-  );
+    return {
+      totalNeeded,
+      locked,
+      missing,
+    };
+  }, [provision, freeBalance, asks, bids]);
 
   const validateStepSizeInput = (value: string) => {
-    if (!kandelParams) return 'Kandel params not loaded';
     const newStepSize = parseInt(value);
-    const pricePoints = kandelParams.levelsPerSide * 2;
+    const pricePoints = kandelInfo!.levelsPerSide * 2;
     return validateStepSize(newStepSize, pricePoints);
   };
 
   const validateGasreqInput = (value: string) => {
-    const newGasreq = parseInt(value);
-    return validateGasreq(newGasreq);
+    return validateGasreq(value);
   };
 
   const handleStepSizeSave = async (value: string) => {
-    if (!kandelParams) throw new Error('Kandel params not loaded');
-
     const newStepSize = parseInt(value);
     try {
-      await kandel.setStepSize(newStepSize);
+      await setStepSize({ kandelAddr: kandelAddress, stepSize: newStepSize });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to set step size.');
     }
   };
 
   const handleGasreqSave = async (value: string) => {
-    if (!kandelParams) throw new Error('Kandel params not loaded');
-
     const newGasreq = parseInt(value);
 
     try {
-      await kandel.setGasReq(newGasreq);
+      await setGasReq({ kandelAddr: kandelAddress, gasreq: newGasreq });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to set gas requirement.');
     }
@@ -179,9 +147,13 @@ export default function KandelDetailPage({ params }: PageProps) {
 
   const handleRetract = async () => {
     try {
-      await kandel.retractAll({ deprovision: false });
+      await retractAll({
+        kandelAddr: kandelAddress,
+        pricePoints: kandelInfo!.levelsPerSide * 2,
+        deprovision: true,
+      });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to retract offers:', error);
     }
@@ -194,9 +166,9 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await kandel.withdrawEthToUser(userAddress);
+      await withdrawEth({ kandelAddr: kandelAddress, recipient: userAddress });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to withdraw ETH:', error);
     }
@@ -208,9 +180,9 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await kandel.withdrawBaseToken(undefined, userAddress);
+      await withdrawToken({ kandelAddr: kandelAddress, tokenType: 'base', recipient: userAddress });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to withdraw base token:', error);
     }
@@ -222,9 +194,9 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await kandel.withdrawQuoteToken(undefined, userAddress);
+      await withdrawToken({ kandelAddr: kandelAddress, tokenType: 'quote', recipient: userAddress });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to withdraw quote token:', error);
     }
@@ -244,9 +216,13 @@ export default function KandelDetailPage({ params }: PageProps) {
     }
 
     try {
-      await kandel.retractAndWithdrawAll(userAddress);
+      await retractAndWithdrawAll({
+        kandelAddr: kandelAddress,
+        recipient: userAddress,
+        pricePoints: kandelInfo!.levelsPerSide * 2,
+      });
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to shutdown Kandel position:', error);
     }
@@ -254,30 +230,18 @@ export default function KandelDetailPage({ params }: PageProps) {
 
   const handleFundProvision = async () => {
     try {
-      await fundMaker(kandelAddress, missingProvision);
+      await fundMaker(kandelAddress, calculatedProvisions.missing);
 
-      await fetchData();
+      // await fetchData();
     } catch (error) {
       console.error('Failed to fund provision:', error);
     }
   };
 
-  useEffect(() => {
-    fetchData(true);
-  }, [fetchData]);
-
-  if (loading) {
+  if (!kandelInfo) {
     return (
       <div className='min-h-screen p-8 flex items-center justify-center'>
         <div className='text-slate-400'>Loading Kandel details...</div>
-      </div>
-    );
-  }
-
-  if (!kandelParams) {
-    return (
-      <div className='min-h-screen p-8 flex items-center justify-center'>
-        <div className='text-red-400'>Failed to load Kandel</div>
       </div>
     );
   }
@@ -318,11 +282,11 @@ export default function KandelDetailPage({ params }: PageProps) {
                 </button>
               </div>
               <KandelForm
-                kandelAddress={kandelAddress}
+                kandelInfo={kandelInfo}
                 isEditing={true}
                 onSuccess={async () => {
                   setShowEditForm(false);
-                  await fetchData();
+                  // Refresh data can be handled by parent component if needed
                 }}
               />
             </div>
@@ -348,9 +312,9 @@ export default function KandelDetailPage({ params }: PageProps) {
                               Token Pair
                             </span>
                             <div className='text-slate-200 font-medium'>
-                              <TokenDisplay address={kandelParams.base} />
+                              <TokenDisplay tokenInfo={baseTokenInfo} />
                               <span className='text-slate-400 mx-2'>→</span>
-                              <TokenDisplay address={kandelParams.quote} />
+                              <TokenDisplay tokenInfo={quoteTokenInfo} />
                             </div>
                           </div>
                           <div className='flex flex-col'>
@@ -358,14 +322,14 @@ export default function KandelDetailPage({ params }: PageProps) {
                               Price Range
                             </span>
                             <div className='text-slate-200 font-medium'>
-                              {kandelParams.minPrice === 0 ||
-                              kandelParams.maxPrice === 0 ? (
+                              {kandelInfo?.minPrice === undefined ||
+                              kandelInfo?.maxPrice === undefined ? (
                                 <span className='text-slate-400'>Not Set</span>
                               ) : (
                                 <>
-                                  {formatAmount(kandelParams.minPrice)}
+                                  {formatAmount(kandelInfo.minPrice)}
                                   <span className='text-slate-400 mx-2'>→</span>
-                                  {formatAmount(kandelParams.maxPrice)}
+                                  {formatAmount(kandelInfo.maxPrice)}
                                 </>
                               )}
                             </div>
@@ -377,15 +341,15 @@ export default function KandelDetailPage({ params }: PageProps) {
                           </span>
                           <div className='space-y-1 mt-1'>
                             <div className='text-slate-300 font-mono text-sm flex items-center gap-2'>
-                              <TokenDisplay address={kandelParams.base} />:
+                              <TokenDisplay tokenInfo={baseTokenInfo} />:
                               <span className='text-slate-400'>
-                                {kandelParams.base}
+                                {baseTokenInfo?.address ?? ''}
                               </span>
                             </div>
                             <div className='text-slate-300 font-mono text-sm flex items-center gap-2'>
-                              <TokenDisplay address={kandelParams.quote} />:
+                              <TokenDisplay tokenInfo={quoteTokenInfo} />:
                               <span className='text-slate-400'>
-                                {kandelParams.quote}
+                                {quoteTokenInfo?.address ?? ''}
                               </span>
                             </div>
                           </div>
@@ -404,21 +368,18 @@ export default function KandelDetailPage({ params }: PageProps) {
                               Levels per Side
                             </span>
                             <div className='text-slate-200 font-medium text-lg'>
-                              {kandelParams.levelsPerSide}
+                              {kandelInfo?.levelsPerSide}
                             </div>
                           </div>
                           <InlineEditField
                             label='Step Size'
-                            value={kandelParams.stepSize}
+                            value={kandelInfo.stepSize}
                             onSave={handleStepSizeSave}
                             validate={validateStepSizeInput}
                             inputType='number'
                             inputClass='w-20'
                             min={1}
-                            max={Math.max(
-                              kandelParams.levelsPerSide * 2 - 1,
-                              1
-                            )}
+                            max={Math.max(kandelInfo.levelsPerSide * 2 - 1, 1)}
                             editTooltip='Edit step size'
                           />
                         </div>
@@ -433,7 +394,7 @@ export default function KandelDetailPage({ params }: PageProps) {
                         <div className='max-w-sm'>
                           <InlineEditField
                             label='Gas Requirement'
-                            value={kandelParams.gasreq}
+                            value={kandelInfo.gasreq}
                             onSave={handleGasreqSave}
                             validate={validateGasreqInput}
                             inputType='number'
@@ -449,15 +410,20 @@ export default function KandelDetailPage({ params }: PageProps) {
                   </div>
 
                   <ProvisionPanel
-                    gasprice={BigInt(kandelParams.gasprice)}
-                    offerGasbase={offerGasbase}
-                    gasreq={BigInt(kandelParams.gasreq)}
-                    nOffers={BigInt(liveOffers)}
-                    lockedProvision={lockedProvision}
-                    freeBalance={freeBalance}
-                    perAskProvision={perAskProvision}
-                    perBidProvision={perBidProvision}
-                    totalProvisionNeeded={totalProvisionNeeded}
+                    gasprice={BigInt(kandelInfo.gasprice)}
+                    offerGasbase={
+                      askOfferGasbase > bidOfferGasbase
+                        ? askOfferGasbase
+                        : bidOfferGasbase
+                    } // just show the max offer gas base
+                    gasreq={BigInt(kandelInfo.gasreq)}
+                    nOffers={BigInt(nLiveOffers)}
+                    totalProvisionNeeded={calculatedProvisions.totalNeeded}
+                    lockedProvision={calculatedProvisions.locked}
+                    missingProvision={calculatedProvisions.missing}
+                    freeBalance={freeBalance || BigInt(0)}
+                    perAskProvision={provision?.perAsk || BigInt(0)}
+                    perBidProvision={provision?.perBid || BigInt(0)}
                   />
                   {/* Actions */}
                   <div className='card'>
@@ -484,24 +450,25 @@ export default function KandelDetailPage({ params }: PageProps) {
                       <button
                         onClick={handleWithdrawBaseToken}
                         className='btn-secondary'
-                        disabled={inventory.baseQty === BigInt(0)}
+                        disabled={baseReserveBalance === BigInt(0)}
                       >
-                        Withdraw <TokenDisplay address={kandelParams.base} />
+                        Withdraw <TokenDisplay tokenInfo={baseTokenInfo} />
                       </button>
                       <button
                         onClick={handleWithdrawQuoteToken}
                         className='btn-secondary'
-                        disabled={inventory.quoteQty === BigInt(0)}
+                        disabled={quoteReserveBalance === BigInt(0)}
                       >
-                        Withdraw <TokenDisplay address={kandelParams.quote} />
+                        Withdraw <TokenDisplay tokenInfo={quoteTokenInfo} />
                       </button>
-                      {missingProvision > BigInt(0) && (
+                      {calculatedProvisions.missing > BigInt(0) && (
                         <button
                           onClick={handleFundProvision}
                           className='btn-warning col-span-2'
+                          disabled={isFundingProvision}
                         >
                           💰 Fund Missing Provision (
-                          {formatEthAmount(missingProvision)} ETH)
+                          {formatEthAmount(calculatedProvisions.missing)} ETH)
                         </button>
                       )}
                       <button
@@ -516,11 +483,11 @@ export default function KandelDetailPage({ params }: PageProps) {
 
                 <div className='space-y-6'>
                   <InventoryCard
-                    baseQty={inventory.baseQty}
-                    quoteQty={inventory.quoteQty}
-                    liveOffers={liveOffers}
-                    baseToken={kandelParams.base}
-                    quoteToken={kandelParams.quote}
+                    baseQty={baseReserveBalance}
+                    quoteQty={quoteReserveBalance}
+                    nOffers={nLiveOffers}
+                    baseTokenInfo={baseTokenInfo}
+                    quoteTokenInfo={quoteTokenInfo}
                   />
 
                   {baseTokenInfo && quoteTokenInfo && (
@@ -538,9 +505,9 @@ export default function KandelDetailPage({ params }: PageProps) {
                   Order Book (Highlighting Your Offers For The Current Kandel)
                 </h2>
                 <OrderBook
-                  base={kandelParams.base}
-                  quote={kandelParams.quote}
-                  tickSpacing={marketTickSpacing}
+                  base={baseTokenInfo?.address}
+                  quote={quoteTokenInfo?.address}
+                  tickSpacing={kandelInfo?.tickSpacing}
                   highlightMakers={[kandelAddress]}
                   key='orderBook-single-kandel'
                 />

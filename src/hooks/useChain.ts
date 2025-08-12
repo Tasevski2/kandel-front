@@ -1,20 +1,28 @@
-import { createConfig, fallback, http } from 'wagmi';
-import { base, anvil } from 'viem/chains';
-import { metaMask } from 'wagmi/connectors';
+'use client';
+
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { getActiveNetwork } from '../config/networks';
 
-// Get the active network based on environment
-const activeNetwork = getActiveNetwork();
+const activeNetwork = getActiveNetwork(); // the chain your app expects
 
-const transports = activeNetwork.rpcUrls.default.http
-  .filter((url) => url.trim())
-  .map((url) => http(url, { timeout: 5_000, retryCount: 2 }));
+export function useChain() {
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
 
-export const config = createConfig({
-  chains: [activeNetwork],
-  connectors: [metaMask()],
-  transports: {
-    [base.id]: fallback(transports),
-    [anvil.id]: fallback(transports),
-  },
-});
+  const isCorrectChain = isConnected && chainId === activeNetwork.id;
+
+  const switchToRequired = () => {
+    if (chainId === activeNetwork.id) return;
+    switchChain({ chainId: activeNetwork.id });
+  };
+
+  return {
+    isConnected,
+    chainId,
+    activeNetwork,
+    isCorrectChain,
+    switchToRequired,
+    isSwitching,
+  };
+}

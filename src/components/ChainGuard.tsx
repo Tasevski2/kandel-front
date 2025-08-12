@@ -1,6 +1,6 @@
 'use client';
 
-import { useChainValidation } from '../hooks/useChainValidation';
+import { useChain } from '../hooks/useChain';
 
 interface ChainGuardProps {
   children: React.ReactNode;
@@ -8,7 +8,7 @@ interface ChainGuardProps {
 }
 
 export function ChainGuard({ children, fallback }: ChainGuardProps) {
-  const { isConnected, isCorrectChain } = useChainValidation();
+  const { isConnected, isCorrectChain } = useChain();
 
   // If not connected, show children (allow them to connect first)
   if (!isConnected) {
@@ -20,13 +20,9 @@ export function ChainGuard({ children, fallback }: ChainGuardProps) {
     if (fallback) {
       return <>{fallback}</>;
     }
-    
+
     // Disable interactive elements by wrapping in a disabled div
-    return (
-      <div className="opacity-50 pointer-events-none">
-        {children}
-      </div>
-    );
+    return <div className='opacity-50 pointer-events-none'>{children}</div>;
   }
 
   // Correct chain, show normal content

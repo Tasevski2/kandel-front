@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Address } from 'viem';
 
 export interface StoredKandel {
-  address: string;
-  baseToken: string;
-  quoteToken: string;
+  address: Address;
+  baseToken: Address;
+  quoteToken: Address;
   tickSpacing: string;
   createdAt: number;
   pairId: string;
@@ -13,7 +14,7 @@ export interface StoredKandel {
 
 export function useKandels() {
   const [kandels, setKandels] = useState<StoredKandel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
 
   // Load kandels from localStorage on mount
   useEffect(() => {
@@ -22,19 +23,11 @@ export function useKandels() {
         const stored = localStorage.getItem('myKandels');
         if (stored) {
           const parsedKandels = JSON.parse(stored);
-          // Handle both old format (array of strings) and new format (array of objects)
+          // simple check if the parsed kandels are of type array
           if (Array.isArray(parsedKandels)) {
-            if (
-              parsedKandels.length > 0 &&
-              typeof parsedKandels[0] === 'string'
-            ) {
-              // Old format - convert to new format, but we can't get the metadata
-              // so we'll just clear it since the user said they deleted localStorage
-              setKandels([]);
-            } else {
-              // New format
-              setKandels(parsedKandels);
-            }
+            setKandels(parsedKandels);
+          } else {
+            setKandels([]);
           }
         }
       } catch (error) {
@@ -93,51 +86,10 @@ export function useKandels() {
     [kandels, saveKandels]
   );
 
-  // Get kandels for a specific market
-  const getKandelsForMarket = useCallback(
-    (baseToken: string, quoteToken: string): StoredKandel[] => {
-      return kandels.filter((kandel) => {
-        const base = baseToken.toLowerCase();
-        const quote = quoteToken.toLowerCase();
-        const kandelBase = kandel.baseToken.toLowerCase();
-        const kandelQuote = kandel.quoteToken.toLowerCase();
-
-        return (
-          (kandelBase === base && kandelQuote === quote) ||
-          (kandelBase === quote && kandelQuote === base)
-        );
-      });
-    },
-    [kandels]
-  );
-
-  // Check if a kandel exists
-  const hasKandel = useCallback(
-    (address: string): boolean => {
-      return kandels.some(
-        (k) => k.address.toLowerCase() === address.toLowerCase()
-      );
-    },
-    [kandels]
-  );
-
-  // Get kandel by address
-  const getKandel = useCallback(
-    (address: string): StoredKandel | undefined => {
-      return kandels.find(
-        (k) => k.address.toLowerCase() === address.toLowerCase()
-      );
-    },
-    [kandels]
-  );
-
   return {
     kandels,
-    loading,
+    isLoading,
     addKandel,
     removeKandel,
-    getKandelsForMarket,
-    hasKandel,
-    getKandel,
   };
 }

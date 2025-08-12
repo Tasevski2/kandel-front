@@ -1,62 +1,52 @@
 'use client';
 
-import { useTokenInfo } from '../hooks/useTokenInfo';
+import { type TokenInfo } from '../hooks/token/useTokenInfo';
+import { formatAddress } from '@/lib/formatting';
 
 interface TokenDisplayProps {
-  address?: `0x${string}`;
+  tokenInfo?: TokenInfo;
   showAddress?: boolean;
   showName?: boolean;
   className?: string;
-  fallback?: string;
 }
 
 export function TokenDisplay({
-  address,
+  tokenInfo,
   showAddress = false,
   showName = false,
   className = '',
-  fallback,
 }: TokenDisplayProps) {
-  const { tokenInfo, loading } = useTokenInfo(address);
-
-  if (!address) {
-    return <span className={className}>{fallback || 'Unknown'}</span>;
-  }
-
-  if (loading && !tokenInfo) {
+  if (!tokenInfo) {
     return <span className={`${className} animate-pulse`}>Loading...</span>;
   }
 
-  const symbol = tokenInfo?.symbol || `${address.slice(0, 6)}...${address.slice(-4)}`;
-  const name = tokenInfo?.name || 'Unknown Token';
-
   return (
     <span className={className}>
-      {symbol}
+      {tokenInfo.symbol}
       {showName && ` (${name})`}
-      {showAddress && ` - ${address.slice(0, 6)}...${address.slice(-4)}`}
+      {showAddress && ` - ${formatAddress(tokenInfo.address)}`}
     </span>
   );
 }
 
 interface TokenPairDisplayProps {
-  baseAddress?: `0x${string}`;
-  quoteAddress?: `0x${string}`;
+  baseTokenInfo?: TokenInfo;
+  quoteTokenInfo?: TokenInfo;
   separator?: string;
   className?: string;
 }
 
 export function TokenPairDisplay({
-  baseAddress,
-  quoteAddress,
+  baseTokenInfo,
+  quoteTokenInfo,
   separator = '/',
   className = '',
 }: TokenPairDisplayProps) {
   return (
     <span className={className}>
-      <TokenDisplay address={baseAddress} />
+      <TokenDisplay tokenInfo={baseTokenInfo} />
       {separator}
-      <TokenDisplay address={quoteAddress} />
+      <TokenDisplay tokenInfo={quoteTokenInfo} />
     </span>
   );
 }

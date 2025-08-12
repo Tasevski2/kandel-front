@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useMgvReader, type Offer } from '../hooks/useMgvReader';
+import { useMemo } from 'react';
 import { formatAmount } from '../lib/formatting';
-import { useTokensInfo } from '../hooks/useTokenInfo';
+import { useTokensInfo } from '../hooks/token/useTokenInfo';
+import type { Address } from 'viem';
+import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
+import type { Offer } from '@/hooks/mangrove/queries/useGetOffers';
 
 interface OrderBookProps {
-  base: `0x${string}`;
-  quote: `0x${string}`;
+  base?: Address;
+  quote?: Address;
   tickSpacing: bigint;
-  highlightMakers?: `0x${string}`[];
+  highlightMakers?: Address[];
 }
 
 export function OrderBook({
@@ -18,84 +20,25 @@ export function OrderBook({
   tickSpacing,
   highlightMakers = [],
 }: OrderBookProps) {
-  const { getBook } = useMgvReader();
-  const [bids, setBids] = useState<Offer[]>([]);
-  const [asks, setAsks] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const tokenAddresses = useMemo(
+    () => (base && quote ? [base, quote] : []),
+    [base, quote]
+  );
+  const { tokensInfo } = useTokensInfo(tokenAddresses);
 
-  // Fetch token symbols for size and value display
-  const { tokensInfo, loading: tokensLoading } = useTokensInfo([base, quote]);
-  const baseTokenInfo = tokensInfo[0];
-  const quoteTokenInfo = tokensInfo[1];
+  const baseTokenInfo = tokensInfo ? tokensInfo[base!] : undefined;
+  const quoteTokenInfo = tokensInfo ? tokensInfo[quote!] : undefined;
 
-  const fetchOrderBook = async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+  const { asks, bids, isLoading, isRefetching, refetch } = useGetOrderBook({
+    base: baseTokenInfo?.address,
+    quote: quoteTokenInfo?.address,
+    baseDec: baseTokenInfo?.decimals,
+    quoteDec: quoteTokenInfo?.decimals,
+    tickSpacing: tickSpacing,
+    maker: null,
+  });
 
-    try {
-      // Fetch both asks and bids in one call with the new API
-      const { asks, bids } = await getBook(
-        base,
-        quote,
-        tickSpacing,
-        highlightMakers,
-        30
-      );
-      setAsks(asks);
-      setBids(bids);
-    } catch (error) {
-      console.error('Failed to fetch order book:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrderBook();
-  }, [base, quote, tickSpacing, getBook, highlightMakers]);
-
-  const handleRefresh = () => {
-    fetchOrderBook(true);
-  };
-
-  const renderRow = (offer: Offer) => {
-    const isHighlighted = offer.isMine;
-    const rowClass = isHighlighted ? 'bg-green-900/30' : 'hover:bg-white/5';
-    const priceClass = offer.side === 'bid' ? 'text-green-400' : 'text-red-400';
-
-    return (
-      <tr
-        key={`${offer.side}-${offer.id}`}
-        className={`${rowClass} transition-colors`}
-      >
-        <td className={`px-3 py-1 text-right ${priceClass}`}>
-          {formatAmount(offer.price)}
-        </td>
-        <td className='px-3 py-1 text-right text-slate-300'>
-          <span className="tabular-nums">{formatAmount(offer.size)}</span>{' '}
-          <span className="text-slate-500 text-xs">{baseTokenInfo?.symbol || '...'}</span>
-        </td>
-        <td className='px-3 py-1 text-right text-slate-400'>
-          <span className="tabular-nums">{formatAmount(offer.value)}</span>{' '}
-          <span className="text-slate-600 text-xs">{quoteTokenInfo?.symbol || '...'}</span>
-        </td>
-        <td className='px-3 py-1 text-right text-slate-500 text-xs'>
-          {offer.maker.slice(0, 6)}...
-          {offer.isMine && ' (Mine)'}
-        </td>
-        <td className='px-3 py-1 text-right text-slate-600 text-xs'>
-          {offer.id.toString()}
-        </td>
-      </tr>
-    );
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className='card'>
         <div className='text-center py-8 text-slate-400'>
@@ -110,12 +53,12 @@ export function OrderBook({
       <div className='flex justify-between items-center mb-4'>
         <h2 className='text-xl font-semibold text-slate-200'>Order Book</h2>
         <button
-          onClick={handleRefresh}
-          disabled={refreshing}
+          onClick={refetch}
+          disabled={isRefetching}
           className='btn-secondary text-sm cursor-pointer flex items-center gap-2'
         >
           <svg
-            className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`}
+            className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`}
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
@@ -157,14 +100,22 @@ export function OrderBook({
                 </tr>
               </thead>
               <tbody>
-                {bids.length === 0 ? (
+                {bids && bids.length ? (
+                  bids.map((bid) => (
+                    <OrderBookRow
+                      key={`${bid.side}-${bid.id}`}
+                      offer={bid}
+                      highlightMakers={highlightMakers}
+                      baseTokenSymbol={baseTokenInfo?.symbol}
+                      quoteTokenSymbol={quoteTokenInfo?.symbol}
+                    />
+                  ))
+                ) : (
                   <tr>
                     <td colSpan={5} className='text-center py-4 text-slate-500'>
                       No bids
                     </td>
                   </tr>
-                ) : (
-                  bids.map((bid) => renderRow(bid))
                 )}
               </tbody>
             </table>
@@ -198,14 +149,22 @@ export function OrderBook({
                 </tr>
               </thead>
               <tbody>
-                {asks.length === 0 ? (
+                {asks && asks.length ? (
+                  asks.map((ask) => (
+                    <OrderBookRow
+                      key={`${ask.side}-${ask.id}`}
+                      offer={ask}
+                      highlightMakers={highlightMakers}
+                      baseTokenSymbol={baseTokenInfo?.symbol}
+                      quoteTokenSymbol={quoteTokenInfo?.symbol}
+                    />
+                  ))
+                ) : (
                   <tr>
                     <td colSpan={5} className='text-center py-4 text-slate-500'>
                       No asks
                     </td>
                   </tr>
-                ) : (
-                  asks.map((ask) => renderRow(ask))
                 )}
               </tbody>
             </table>
@@ -213,5 +172,53 @@ export function OrderBook({
         </div>
       </div>
     </div>
+  );
+}
+
+interface OrderBookRowProps {
+  offer: Offer;
+  highlightMakers: Address[];
+  baseTokenSymbol?: string;
+  quoteTokenSymbol?: string;
+}
+
+function OrderBookRow({
+  offer,
+  highlightMakers,
+  baseTokenSymbol,
+  quoteTokenSymbol,
+}: OrderBookRowProps) {
+  const isMine = highlightMakers.includes(offer.maker);
+  const rowClass = isMine ? 'bg-green-900/30' : 'hover:bg-white/5';
+  const priceClass = offer.side === 'bid' ? 'text-green-400' : 'text-red-400';
+
+  return (
+    <tr
+      key={`${offer.side}-${offer.id}`}
+      className={`${rowClass} transition-colors`}
+    >
+      <td className={`px-3 py-1 text-right ${priceClass}`}>
+        {formatAmount(offer.price)}
+      </td>
+      <td className='px-3 py-1 text-right text-slate-300'>
+        <span className='tabular-nums'>{formatAmount(offer.size)}</span>{' '}
+        <span className='text-slate-500 text-xs'>
+          {baseTokenSymbol || '...'}
+        </span>
+      </td>
+      <td className='px-3 py-1 text-right text-slate-400'>
+        <span className='tabular-nums'>{formatAmount(offer.value)}</span>{' '}
+        <span className='text-slate-600 text-xs'>
+          {quoteTokenSymbol || '...'}
+        </span>
+      </td>
+      <td className='px-3 py-1 text-right text-slate-500 text-xs'>
+        {offer.maker.slice(0, 6)}...
+        {isMine && ' (Mine)'}
+      </td>
+      <td className='px-3 py-1 text-right text-slate-600 text-xs'>
+        {offer.id.toString()}
+      </td>
+    </tr>
   );
 }

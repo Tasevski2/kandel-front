@@ -8,10 +8,9 @@ import { MarketDropdown } from '../components/MarketDropdown';
 import { KandelsDropdown } from '../components/KandelsDropdown';
 import { OrderBook } from '../components/OrderBook';
 import { NoMarketsMessage } from '../components/NoMarketsMessage';
-import { useMarkets } from '../hooks/useMarkets';
-import { useKandels } from '../hooks/useKandels';
-import { useMgvReader } from '../hooks/useMgvReader';
-import type { Market } from '../hooks/useMarkets';
+import { useGetMarkets } from '../hooks/mangrove/queries/useGetMarkets';
+import { useKandels } from '../hooks/kandel/useKandels';
+import type { Market } from '../hooks/mangrove/queries/useGetMarkets';
 import {
   APP_LABELS,
   KANDEL_LABELS,
@@ -19,33 +18,21 @@ import {
   ERROR_LABELS,
   STATUS_LABELS,
 } from '../lib/ui-constants';
+import { Address } from 'viem';
+import { useGetNumOfOpenMarkets } from '@/hooks/mangrove/queries/useGetNumOfOpenMarkets';
 
 export default function HomePage() {
   const router = useRouter();
-  const { markets, loading, error } = useMarkets();
-  const { kandels, loading: kandelsLoading } = useKandels();
-  const { getNumOpenMarkets } = useMgvReader();
+  const { markets, isLoading, error } = useGetMarkets();
+  const { kandels, isLoading: kandelsLoading } = useKandels();
+  const { numOfOpenMarkets } = useGetNumOfOpenMarkets();
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
-  const [openMarketsCount, setOpenMarketsCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (markets.length > 0 && !selectedMarket) {
       setSelectedMarket(markets[0]);
     }
   }, [markets, selectedMarket]);
-
-  useEffect(() => {
-    const fetchMarketCount = async () => {
-      try {
-        const count = await getNumOpenMarkets();
-        setOpenMarketsCount(count);
-      } catch (error) {
-        setOpenMarketsCount(null);
-      }
-    };
-
-    fetchMarketCount();
-  }, [getNumOpenMarkets]);
 
   const handleCreateKandel = () => {
     router.push('/kandel/new');
@@ -87,12 +74,12 @@ export default function HomePage() {
                   markets={markets}
                   selectedMarket={selectedMarket}
                   onMarketSelect={setSelectedMarket}
-                  loading={loading}
+                  isLoading={isLoading}
                   placeholder={MARKET_LABELS.getStarted}
                 />
-                {openMarketsCount !== null && (
+                {numOfOpenMarkets !== undefined && (
                   <p className='text-slate-500 text-sm mt-2'>
-                    {openMarketsCount} {STATUS_LABELS.marketsAvailable}
+                    {numOfOpenMarkets} {STATUS_LABELS.marketsAvailable}
                   </p>
                 )}
               </div>
@@ -104,7 +91,7 @@ export default function HomePage() {
                 <div className='space-y-3'>
                   <KandelsDropdown
                     kandels={kandels}
-                    loading={kandelsLoading}
+                    isLoading={kandelsLoading}
                     placeholder={KANDEL_LABELS.noPositions}
                   />
                   <div className='flex gap-3'>
@@ -133,11 +120,11 @@ export default function HomePage() {
                 base={selectedMarket.baseToken}
                 quote={selectedMarket.quoteToken}
                 tickSpacing={selectedMarket.tickSpacing}
-                highlightMakers={kandels.map((k) => k.address as `0x${string}`)}
+                highlightMakers={kandels.map((k) => k.address as Address)}
               />
             )}
 
-            {!selectedMarket && !loading && markets.length === 0 && (
+            {!selectedMarket && !isLoading && markets.length === 0 && (
               <NoMarketsMessage />
             )}
           </div>

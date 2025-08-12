@@ -1,4 +1,4 @@
-import { formatUnits } from 'viem';
+import { Address, formatUnits } from 'viem';
 
 /**
  * BigInt token amount formatter using viem + formatAmount combo
@@ -106,4 +106,8 @@ export function formatAmount(amount: number, maxDecimals: number = 18): string {
   }
 
   return isNegative ? `-${result}` : result;
+}
+
+export function formatAddress(addr: Address): string {
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }

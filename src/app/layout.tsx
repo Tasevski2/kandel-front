@@ -1,35 +1,44 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { Providers } from "./providers";
+import { type ReactNode } from 'react';
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import { cookieToInitialState } from 'wagmi';
+import { headers } from 'next/headers';
+import { config } from '@/config/wagmiConfig';
+import { Providers } from './providers';
+import './globals.css';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Kandel Position Manager",
-  description: "Manage Kandel positions on Mangrove",
+  title: 'Kandel Position Manager',
+  description: 'Manage Kandel positions on Mangrove',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
+  const wagmiInitialState = cookieToInitialState(
+    config,
+    (await headers()).get('cookie')
+  );
+
   return (
-    <html lang="en">
+    <html lang='en'>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <Providers>{children}</Providers>
+        <Providers wagmiInitialState={wagmiInitialState}>{children}</Providers>
       </body>
     </html>
   );
