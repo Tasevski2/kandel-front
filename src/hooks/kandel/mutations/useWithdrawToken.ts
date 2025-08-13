@@ -5,6 +5,7 @@ import { KandelABI } from '@/abi/kandel';
 import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface WithdrawTokenParams {
   kandelAddr: Address;
@@ -15,6 +16,7 @@ interface WithdrawTokenParams {
 export function useWithdrawToken() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,6 +24,10 @@ export function useWithdrawToken() {
     const { kandelAddr, tokenType, recipient } = params;
 
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing token withdrawal…',
+    });
+    let txHash: Address | undefined;
     try {
       // Get the current token reserve balance
       const reserveType = tokenType === 'base' ? 1 : 0; // 1 = Ask = Base, 0 = Bid = Quote
@@ -40,25 +46,45 @@ export function useWithdrawToken() {
       const baseAmount = tokenType === 'base' ? balance : BigInt(0);
       const quoteAmount = tokenType === 'quote' ? balance : BigInt(0);
 
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'withdrawFunds',
         args: [baseAmount, quoteAmount, recipient || kandelAddr],
       });
+      setTxToast('submitted', {
+        message: 'Withdrawal submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
 
       await invalidateQueriesByScopeKey(
         QUERY_SCOPE_KEYS.RESERVE_BALANCES,
         true
       );
 
+      setTxToast('success', {
+        message: 'Tokens withdrawn successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to withdraw tokens.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

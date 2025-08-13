@@ -5,6 +5,7 @@ import { type Address, parseEventLogs } from 'viem';
 import { kandelSeederABI } from '@/abi/kandelSeeder';
 import { ADDRESSES } from '@/lib/addresses';
 import { TRANSACTION_CONFIRMATIONS } from '@/lib/constants';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface CreateParams {
   base: Address;
@@ -14,13 +15,18 @@ interface CreateParams {
 
 export function useKandelSeeder() {
   const config = useConfig();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
   const create = async (params: CreateParams): Promise<Address> => {
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing Kandel deployment…',
+    });
+    let txHash: Address | undefined;
     try {
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: ADDRESSES.kandelSeeder,
         abi: kandelSeederABI,
         functionName: 'sow',
@@ -33,13 +39,20 @@ export function useKandelSeeder() {
           false,
         ],
       });
+      setTxToast('submitted', {
+        message: 'Deployment submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, { 
-        hash, 
+        hash: txHash, 
         confirmations: TRANSACTION_CONFIRMATIONS 
       });
 
-      if (!receipt) throw new Error('Transaction failed');
+      if (receipt.status !== 'success') {
+        throw new Error('Transaction failed');
+      }
 
       const logs = parseEventLogs({
         abi: kandelSeederABI,
@@ -51,8 +64,19 @@ export function useKandelSeeder() {
         throw new Error('Kandel creation failed - no address in events');
       }
 
+      setTxToast('success', {
+        message: 'Kandel deployed successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       return sowEvent.args.kandel as Address;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to deploy Kandel.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

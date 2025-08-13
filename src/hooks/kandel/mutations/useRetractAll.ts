@@ -6,6 +6,7 @@ import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
 import { useWithdrawEth } from '../../mangrove/mutations/useWithdrawEth';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface RetractAllParams {
   kandelAddr: Address;
@@ -16,6 +17,7 @@ interface RetractAllParams {
 export function useRetractAll() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const { withdrawEth } = useWithdrawEth();
   const [isLoading, setIsLoading] = useState(false);
@@ -24,18 +26,31 @@ export function useRetractAll() {
     const { kandelAddr, pricePoints, deprovision } = params;
 
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing offer retraction…',
+    });
+    let txHash: Address | undefined;
     try {
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'retractOffers',
         args: [BigInt(0), BigInt(pricePoints)], // Retract from index 0 to all price points
       });
+      setTxToast('submitted', {
+        message: 'Retraction submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
 
       await Promise.all([
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.PARAMS),
@@ -45,12 +60,23 @@ export function useRetractAll() {
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.OFFER_LIST),
       ]);
 
+      setTxToast('success', {
+        message: 'All offers retracted successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       if (deprovision) {
         await withdrawEth({ kandelAddr });
       }
 
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to retract offers.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

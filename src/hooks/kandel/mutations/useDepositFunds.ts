@@ -8,6 +8,7 @@ import { KandelABI } from '@/abi/kandel';
 import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { useErc20Approve } from '../../token/useErc20Approve';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 type DepositFundsArgs = {
   kandel: Address;
@@ -20,6 +21,7 @@ type DepositFundsArgs = {
 export function useDepositFunds() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { erc20Approve } = useErc20Approve();
   const { writeContractAsync } = useWriteContract();
 
@@ -31,30 +33,56 @@ export function useDepositFunds() {
     if (baseAmount <= BigInt(0) && quoteAmount <= BigInt(0)) {
       return;
     }
+
     setLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing deposit…',
+    });
+    let txHash: Address | undefined;
+
     try {
       await erc20Approve(baseToken, kandel, baseAmount);
       await erc20Approve(quoteToken, kandel, quoteAmount);
 
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandel,
         abi: KandelABI,
         functionName: 'depositFunds',
         args: [baseAmount, quoteAmount],
       });
+      setTxToast('submitted', {
+        message: 'Deposit submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
 
       await invalidateQueriesByScopeKey(
         QUERY_SCOPE_KEYS.RESERVE_BALANCES,
         true
       );
 
+      setTxToast('success', {
+        message: 'Funds deposited successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to deposit funds.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setLoading(false);

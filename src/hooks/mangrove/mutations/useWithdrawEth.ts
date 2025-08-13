@@ -7,6 +7,7 @@ import { ADDRESSES } from '@/lib/addresses';
 import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { Address } from 'viem';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface WithdrawEthParams {
   kandelAddr: Address;
@@ -17,7 +18,7 @@ interface WithdrawEthParams {
 export function useWithdrawEth() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
-
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +26,10 @@ export function useWithdrawEth() {
     const { kandelAddr, amount, recipient } = params;
 
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing ETH withdrawal…',
+    });
+    let txHash: Address | undefined;
     try {
       // If no amount specified, get the current balance
       const balance =
@@ -41,22 +46,42 @@ export function useWithdrawEth() {
       }
 
       // Use Kandel's withdrawFromMangrove function
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'withdrawFromMangrove',
         args: [balance, recipient || kandelAddr],
       });
+      setTxToast('submitted', {
+        message: 'ETH withdrawal submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
 
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
+
       await invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BALANCE_OF);
+
+      setTxToast('success', {
+        message: 'ETH withdrawn successfully.',
+        id: toastId,
+        hash: txHash,
+      });
 
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to withdraw ETH.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

@@ -5,6 +5,7 @@ import { KandelABI } from '@/abi/kandel';
 import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import type { Address } from 'viem';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 export interface PopulateFromOffsetParams {
   kandelAddr: Address;
@@ -29,13 +30,18 @@ export interface PopulateFromOffsetParams {
 export function usePopulateFromOffset() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
   const populateFromOffset = async (params: PopulateFromOffsetParams) => {
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing offer population…',
+    });
+    let txHash: Address | undefined;
     try {
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: params.kandelAddr,
         abi: KandelABI,
         functionName: 'populateFromOffset',
@@ -58,11 +64,20 @@ export function usePopulateFromOffset() {
         ],
         value: params.provisionValue,
       });
+      setTxToast('submitted', {
+        message: 'Population submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
 
       await Promise.all([
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BASE_QUOTE_TICK_OFFSET),
@@ -73,8 +88,19 @@ export function usePopulateFromOffset() {
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.OFFER_LIST),
       ]);
 
+      setTxToast('success', {
+        message: 'Offers populated successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to populate offers.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

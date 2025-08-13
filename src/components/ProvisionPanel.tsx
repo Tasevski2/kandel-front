@@ -90,7 +90,7 @@ export function ProvisionPanel({
           </div>
 
           <div className='flex justify-between'>
-            <span className='text-slate-400'>Locked Provision:</span>
+            <span className='text-slate-400'>Est. Locked Provision:</span>
             <span className='text-slate-200'>
               {formatEthAmount(lockedProvision)} ETH
             </span>

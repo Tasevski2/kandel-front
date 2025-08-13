@@ -4,7 +4,8 @@ import { waitForTransactionReceipt } from '@wagmi/core';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 import { KandelABI } from '@/abi/kandel';
 import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
-import { Address } from 'viem';
+import type { Address } from 'viem';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface SetGasReqParams {
   kandelAddr: Address;
@@ -14,6 +15,7 @@ interface SetGasReqParams {
 export function useSetGasReq() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,23 +27,47 @@ export function useSetGasReq() {
     }
 
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing gas requirement update…',
+    });
+    let txHash: Address | undefined; // Address type for transaction hash, same type `0x${string}`
     try {
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'setGasreq',
         args: [BigInt(gasreq)],
       });
+      setTxToast('submitted', {
+        message: 'Gas requirement update submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
 
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
+
       await invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.PARAMS);
+
+      setTxToast('success', {
+        message: 'Gas requirement updated successfully.',
+        id: toastId,
+        hash: txHash,
+      });
 
       return receipt;
     } catch (error) {
+      setTxToast('failed', {
+        message: 'Failed to update gas requirement.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);

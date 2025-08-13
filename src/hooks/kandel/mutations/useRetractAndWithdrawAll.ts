@@ -9,6 +9,7 @@ import {
 } from '@/lib/constants';
 import { Address } from 'viem';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
+import { useTxToast } from '@/hooks/useTxToast';
 
 interface RetractAndWithdrawAllParams {
   kandelAddr: Address;
@@ -19,6 +20,7 @@ interface RetractAndWithdrawAllParams {
 export function useRetractAndWithdrawAll() {
   const config = useConfig();
   const { invalidateQueriesByScopeKey } = useInvalidateQueries();
+  const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,8 +28,12 @@ export function useRetractAndWithdrawAll() {
     const { kandelAddr, recipient, pricePoints } = params;
 
     setIsLoading(true);
+    const toastId = setTxToast('signing', {
+      message: 'Signing full withdrawal…',
+    });
+    let txHash: Address | undefined;
     try {
-      const hash = await writeContractAsync({
+      txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'retractAndWithdraw',
@@ -40,11 +46,20 @@ export function useRetractAndWithdrawAll() {
           recipient, // recipient: send all withdrawals to user
         ],
       });
+      setTxToast('submitted', {
+        message: 'Withdrawal submitted. Waiting for confirmation…',
+        id: toastId,
+        hash: txHash,
+      });
 
       const receipt = await waitForTransactionReceipt(config, {
-        hash,
+        hash: txHash,
         confirmations: TRANSACTION_CONFIRMATIONS,
       });
+
+      if (receipt.status !== 'success') {
+        throw new Error();
+      }
 
       await Promise.all([
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.BASE_QUOTE_TICK_OFFSET),
@@ -54,9 +69,19 @@ export function useRetractAndWithdrawAll() {
         invalidateQueriesByScopeKey(QUERY_SCOPE_KEYS.OFFER_LIST),
       ]);
 
+      setTxToast('success', {
+        message: 'Position closed successfully.',
+        id: toastId,
+        hash: txHash,
+      });
+
       return receipt;
     } catch (error) {
-      console.error('Failed to completely shut down Kandel position:', error);
+      setTxToast('failed', {
+        message: 'Failed to close position.',
+        id: toastId,
+        hash: txHash,
+      });
       throw error;
     } finally {
       setIsLoading(false);
