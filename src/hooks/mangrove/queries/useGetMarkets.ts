@@ -12,12 +12,11 @@ export interface Market {
   tkn0: Address;
   tkn1: Address;
   tickSpacing: bigint;
-  // Computed properties
   baseToken: Address;
   quoteToken: Address;
   baseTokenInfo: TokenInfo;
   quoteTokenInfo: TokenInfo;
-  pairId: string; // e.g., "WETH_USDC"
+  pairId: string;
   isActive: boolean;
 }
 
@@ -35,7 +34,6 @@ export interface MarketConfig {
 }
 
 export function useGetMarkets() {
-  // Fetch open markets with their configurations using modern wagmi pattern
   const {
     data: marketsData,
     isLoading: isMarketsLoading,
@@ -45,25 +43,23 @@ export function useGetMarkets() {
     address: ADDRESSES.mgvReader,
     abi: readerAbi,
     functionName: 'openMarkets',
-    args: [true], // withConfig = true
+    args: [true],
   });
 
-  // Extract all unique token addresses from markets data
   const allTokenAddresses = useMemo(() => {
     if (!marketsData) return [];
 
     const [rawMarkets] = marketsData as [any[], any[]];
     const tokenAddressSet = new Set<Address>();
-    
+
     rawMarkets.forEach((market) => {
       tokenAddressSet.add(market.tkn0);
       tokenAddressSet.add(market.tkn1);
     });
-    
+
     return Array.from(tokenAddressSet);
   }, [marketsData]);
 
-  // Fetch token information using existing hook with wagmi caching
   const {
     tokensInfo,
     isLoading: isTokensLoading,
@@ -78,35 +74,29 @@ export function useGetMarkets() {
 
     const [rawMarkets, rawConfigs] = marketsData as [any[], any[]];
 
-    // Create token info map for efficient lookup
     const tokenInfoMap = new Map<string, TokenInfo>();
     Object.entries(tokensInfo).forEach(([address, tokenInfo]) => {
       tokenInfoMap.set(address.toLowerCase(), tokenInfo);
     });
 
-    // Process markets to add computed properties
     const processedMarkets: Market[] = rawMarkets
       .map((market, index) => {
-        // Determine correct base/quote token order using token info
-        const { base: baseToken, quote: quoteToken } = determineBaseQuoteDirection(
-          market.tkn0 as Address,
-          market.tkn1 as Address,
-          tokenInfoMap
-        );
+        const { base: baseToken, quote: quoteToken } =
+          determineBaseQuoteDirection(
+            market.tkn0 as Address,
+            market.tkn1 as Address,
+            tokenInfoMap
+          );
 
-        // Get token info for base and quote
         const baseTokenInfo = tokenInfoMap.get(baseToken.toLowerCase());
         const quoteTokenInfo = tokenInfoMap.get(quoteToken.toLowerCase());
 
-        // Skip market if we don't have token info
         if (!baseTokenInfo || !quoteTokenInfo) {
           return null;
         }
 
-        // Create a pair identifier using symbols
         const pairId = `${baseTokenInfo.symbol}_${quoteTokenInfo.symbol}`;
 
-        // Check if market is active (either direction)
         const marketConfig = rawConfigs[index];
         const isActive =
           marketConfig?.config01?.active && marketConfig?.config10?.active;
@@ -125,7 +115,6 @@ export function useGetMarkets() {
       })
       .filter((market): market is Market => market !== null);
 
-    // Process configs
     const processedConfigs: MarketConfig[] = rawConfigs.map((config) => ({
       config01: {
         active: config.config01?.active || false,
@@ -142,18 +131,17 @@ export function useGetMarkets() {
     return { markets: processedMarkets, configs: processedConfigs };
   }, [marketsData, tokensInfo]);
 
-  // Helper function to parse pair ID and get market
   const getMarketByPairId = useMemo(
     () =>
-      (pairId: string): {
+      (
+        pairId: string
+      ): {
         market: Market | undefined;
         baseToken: Address | undefined;
         quoteToken: Address | undefined;
       } => {
-        // First try exact match
         let market = markets.find((m) => m.pairId === pairId);
 
-        // If not found, try reverse order (USDC_WETH vs WETH_USDC)
         if (!market && pairId.includes('_')) {
           const [symbol1, symbol2] = pairId.split('_');
           const reversePairId = `${symbol2}_${symbol1}`;
@@ -177,7 +165,6 @@ export function useGetMarkets() {
     [markets]
   );
 
-  // Combine loading states and errors
   const isLoading = isMarketsLoading || isTokensLoading;
   const error = marketsError?.message || tokensError || null;
 

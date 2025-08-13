@@ -4,6 +4,7 @@ import { useReadContracts } from 'wagmi';
 import type { Address } from 'viem';
 import { ADDRESSES } from '@/lib/addresses';
 import { readerAbi } from '@/abi/reader';
+import { KILO_TO_GAS_UNITS } from '@/lib/constants';
 
 interface LocalConfigsParams {
   base?: Address;
@@ -23,7 +24,6 @@ export function useGetLocalConfigs({
     contracts: !enabled
       ? []
       : [
-          // ASK side (BASE -> QUOTE)
           {
             address: ADDRESSES.mgvReader,
             abi: readerAbi,
@@ -36,7 +36,6 @@ export function useGetLocalConfigs({
               },
             ],
           },
-          // BID side (QUOTE -> BASE)
           {
             address: ADDRESSES.mgvReader,
             abi: readerAbi,
@@ -60,7 +59,6 @@ export function useGetLocalConfigs({
     if (!res) {
       return { active: false, density: BigInt(0), offerGasbase: BigInt(0) };
     }
-    // Be tolerant to different case/keys from ABI generation
     const active = res.active;
     const density = res.density as bigint;
 
@@ -69,13 +67,13 @@ export function useGetLocalConfigs({
     return {
       active,
       density,
-      offerGasbase: kGas * BigInt(1000), // convert kilo → gas units
+      offerGasbase: kGas * BigInt(KILO_TO_GAS_UNITS),
     };
   };
 
   return {
-    ask: parseLocal(data?.[0]), // BASE -> QUOTE local config
-    bid: parseLocal(data?.[0]), // QUOTE -> BASE local config
+    ask: parseLocal(data?.[0]),
+    bid: parseLocal(data?.[0]),
     isLoading,
   };
 }

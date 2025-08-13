@@ -13,7 +13,6 @@ export interface DeploymentConfig {
   };
 }
 
-// Cache for deployment config
 let cachedDeployment: DeploymentConfig | null = null;
 
 /**
@@ -26,7 +25,6 @@ export function getDeployment(): DeploymentConfig {
 
   const deployment = isDevelopment() ? anvilDeployment : baseDeployment;
 
-  // Validate and type-cast the deployment
   cachedDeployment = {
     chainId: deployment.chainId,
     chainName: deployment.chainName,
@@ -46,11 +44,4 @@ export function getDeployment(): DeploymentConfig {
 export function getContracts() {
   const deployment = getDeployment();
   return deployment.contracts;
-}
-
-/**
- * Clear the cached deployment (useful for testing or environment changes)
- */
-export function clearDeploymentCache() {
-  cachedDeployment = null;
 }

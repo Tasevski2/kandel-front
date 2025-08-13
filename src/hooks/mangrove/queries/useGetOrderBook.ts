@@ -4,10 +4,10 @@ import type { Address } from 'viem';
 import { useGetOffers } from './useGetOffers';
 
 interface GetOrderBookParams {
-  base?: Address; // BASE token
-  quote?: Address; // QUOTE token
-  baseDec?: number; // BASE token decimals
-  quoteDec?: number; // QUOTE token decimals
+  base?: Address;
+  quote?: Address;
+  baseDec?: number;
+  quoteDec?: number;
   tickSpacing?: bigint;
   maker?: Address | null;
 }

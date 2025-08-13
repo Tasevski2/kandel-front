@@ -1,7 +1,6 @@
 import { parseUnits } from 'viem';
 import { TICK_BASE } from './constants';
 
-// Simple tick to price conversion without decimal adjustments
 export function tickToPrice(tick: number | bigint): number {
   return Math.pow(TICK_BASE, Number(tick));
 }
@@ -19,7 +18,6 @@ export function maxPriceToTick(price: number): number {
 }
 
 export function parseAmount(amount: string, decimals: number): bigint {
-  // Validate input
   if (!amount || amount.trim() === '' || isNaN(parseFloat(amount))) {
     return BigInt(0);
   }

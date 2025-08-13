@@ -38,12 +38,12 @@ export function useRetractAndWithdrawAll() {
         abi: KandelABI,
         functionName: 'retractAndWithdraw',
         args: [
-          BigInt(0), // from: start at index 0
-          BigInt(pricePoints), // to: retract all offers (levelsPerSide * 2)
-          MAX_UINT256, // baseAmount: withdraw all base tokens
-          MAX_UINT256, // quoteAmount: withdraw all quote tokens
-          MAX_UINT256, // freeWei: withdraw all ETH provisions
-          recipient, // recipient: send all withdrawals to user
+          BigInt(0),
+          BigInt(pricePoints),
+          MAX_UINT256,
+          MAX_UINT256,
+          MAX_UINT256,
+          recipient,
         ],
       });
       setTxToast('submitted', {

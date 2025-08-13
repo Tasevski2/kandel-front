@@ -3,7 +3,7 @@
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { getActiveNetwork } from '../config/networks';
 
-const activeNetwork = getActiveNetwork(); // the chain your app expects
+const activeNetwork = getActiveNetwork();
 
 export function useChain() {
   const { isConnected } = useAccount();

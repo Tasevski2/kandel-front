@@ -30,7 +30,7 @@ export function useSetGasReq() {
     const toastId = setTxToast('signing', {
       message: 'Signing gas requirement update…',
     });
-    let txHash: Address | undefined; // Address type for transaction hash, same type `0x${string}`
+    let txHash: Address | undefined;
     try {
       txHash = await writeContractAsync({
         address: kandelAddr,

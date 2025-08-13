@@ -1,4 +1,3 @@
-// UI text constants grouped by component/feature
 
 export const APP_LABELS = {
   title: "Kandel Position Manager",

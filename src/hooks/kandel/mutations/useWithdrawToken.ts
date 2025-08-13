@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useConfig, useWriteContract } from 'wagmi';
-import { readContract, waitForTransactionReceipt } from '@wagmi/core';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import { KandelABI } from '@/abi/kandel';
-import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
+import {
+  TRANSACTION_CONFIRMATIONS,
+  QUERY_SCOPE_KEYS,
+  MAX_UINT256,
+} from '@/lib/constants';
 import { Address } from 'viem';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 import { useTxToast } from '@/hooks/useTxToast';
@@ -10,7 +14,7 @@ import { useTxToast } from '@/hooks/useTxToast';
 interface WithdrawTokenParams {
   kandelAddr: Address;
   tokenType: 'base' | 'quote';
-  recipient?: Address;
+  recipient: Address;
 }
 
 export function useWithdrawToken() {
@@ -19,7 +23,9 @@ export function useWithdrawToken() {
   const { setTxToast } = useTxToast();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState(false);
-
+  // withdraw all funds
+  // not production ready, we are not checking if
+  // the user has enough funds to cover the offers
   const withdrawToken = async (params: WithdrawTokenParams) => {
     const { kandelAddr, tokenType, recipient } = params;
 
@@ -29,28 +35,14 @@ export function useWithdrawToken() {
     });
     let txHash: Address | undefined;
     try {
-      // Get the current token reserve balance
-      const reserveType = tokenType === 'base' ? 1 : 0; // 1 = Ask = Base, 0 = Bid = Quote
-      const balance = (await readContract(config, {
-        address: kandelAddr,
-        abi: KandelABI,
-        functionName: 'reserveBalance',
-        args: [reserveType],
-      })) as bigint;
-
-      if (balance <= BigInt(0)) {
-        throw new Error(`No ${tokenType} token balance to withdraw`);
-      }
-
-      // Use Kandel's withdrawFunds function
-      const baseAmount = tokenType === 'base' ? balance : BigInt(0);
-      const quoteAmount = tokenType === 'quote' ? balance : BigInt(0);
+      const baseAmount = tokenType === 'base' ? MAX_UINT256 : BigInt(0);
+      const quoteAmount = tokenType === 'quote' ? MAX_UINT256 : BigInt(0);
 
       txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'withdrawFunds',
-        args: [baseAmount, quoteAmount, recipient || kandelAddr],
+        args: [baseAmount, quoteAmount, recipient],
       });
       setTxToast('submitted', {
         message: 'Withdrawal submitted. Waiting for confirmation…',

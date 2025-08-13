@@ -1,4 +1,3 @@
-// Validation utilities
 
 import { MAX_TICK, MAX_UINT24, MAX_UINT32, MIN_TICK } from './constants';
 
@@ -15,13 +14,11 @@ export function validateStepSize(
   return null;
 }
 
-// TODO: we need to use this function
 export function validateLevelsPerSide(levels: number): string | null {
   if (levels <= 0) {
     return 'Levels per side must be a positive number';
   }
-  // Calculate price points (levels * 2 - 1)
-  const pricePoints = levels * 2 - 1;
+  const pricePoints = levels * 2;
   if (pricePoints > MAX_UINT32) {
     return 'Too many price levels requested. Please reduce the number of levels.';
   }

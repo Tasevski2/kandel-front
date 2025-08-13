@@ -1,4 +1,3 @@
-// src/hooks/kandel/useKandelInfo.ts
 'use client';
 
 import { useMemo } from 'react';

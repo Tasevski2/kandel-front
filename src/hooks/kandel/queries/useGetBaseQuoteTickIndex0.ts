@@ -33,7 +33,6 @@ export function useGetBaseQuoteTickIndex0({
     maker: kandelAddr,
   });
 
-  // Since offerList is sorted best→worse, the first row is the lowest-price ask for this maker.
   const baseQuoteTickIndex0 = useMemo(() => {
     if (asks.isLoading || asks.offers === undefined) return;
     if (!asks.offers.length) return null;

@@ -16,13 +16,13 @@ export function useGetReserveBalances(kandelAddr?: Address) {
             address: kandelAddr!,
             abi: KandelABI,
             functionName: 'reserveBalance',
-            args: [1], // Ask -> BASE
+            args: [1],
           },
           {
             address: kandelAddr!,
             abi: KandelABI,
             functionName: 'reserveBalance',
-            args: [0], // Bid → QUOTE
+            args: [0],
           },
         ],
     allowFailure: false,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useKandelSeeder } from '@/hooks/kandel/mutations/useKandelSeeder';
 import { useRetractAll } from '@/hooks/kandel/mutations/useRetractAll';
@@ -45,12 +45,10 @@ type KandelFormProps = {
   onSuccess?: (address: Address) => void;
 } & (
   | {
-      // Edit mode
       isEditing: true;
       kandelInfo: KandelInfo;
     }
   | {
-      // Create mode
       isEditing?: false;
       market: Market;
     }
@@ -77,6 +75,11 @@ function getGeometricDistributionOffersCounts(params: {
   };
 }
 
+/**
+ * Complex form hook for managing Kandel position creation and editing.
+ * Handles real-time validation, price calculations, provision estimates,
+ * and transaction orchestration for both create and edit modes.
+ */
 export function useKandelForm(props: KandelFormProps) {
   const { onSuccess } = props;
   const isEditing = 'isEditing' in props && props.isEditing === true;
@@ -112,11 +115,9 @@ export function useKandelForm(props: KandelFormProps) {
     () => (hasValidTokens ? [base!, quote!] : []),
     [base, quote, hasValidTokens]
   );
-  // in edit mode it won't do additional http request, will get the data from cache
   const { tokensInfo, isLoading: tokensLoading } =
     useTokensInfo(tokenAddresses);
 
-  // Use kandelInfo tokens when available, otherwise fetch
   const baseTokenInfo =
     isEditing && kandelInfo
       ? kandelInfo.base
@@ -130,7 +131,6 @@ export function useKandelForm(props: KandelFormProps) {
       ? tokensInfo[quote]
       : undefined;
 
-  // Initialize form fields - use kandelInfo when editing
   const [minPrice, setMinPrice] = useState(() => {
     if (isEditing && kandelInfo?.minPrice) {
       return kandelInfo.minPrice.toString();
@@ -171,7 +171,6 @@ export function useKandelForm(props: KandelFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // New state for enhancements
   const [minVolumeError, setMinVolumeError] = useState<string | null>(null);
   const [stepSizeError, setStepSizeError] = useState<string | null>(null);
   const [priceRangeError, setPriceRangeError] = useState<string | null>(null);
@@ -180,15 +179,12 @@ export function useKandelForm(props: KandelFormProps) {
   );
   const [gasreqError, setGasreqError] = useState<string | null>(null);
 
-  // Track whether user has edited price fields
   const [minPriceTouched, setMinPriceTouched] = useState(false);
   const [maxPriceTouched, setMaxPriceTouched] = useState(false);
 
-  // Edit mode state
   const [addInventory, setAddInventory] = useState(!isEditing);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Fetch Kandel reserve balances using the new hook
   const { baseBalance: kandelBaseReserve, quoteBalance: kandelQuoteReserve } =
     useGetReserveBalances(kandelAddress);
 
@@ -232,7 +228,6 @@ export function useKandelForm(props: KandelFormProps) {
         : null,
   });
 
-  // Dirty field detection - only active in edit mode
   const dirty = isEditing
     ? {
         minMax: minPriceTouched || maxPriceTouched,
@@ -248,10 +243,8 @@ export function useKandelForm(props: KandelFormProps) {
   const { populateFromOffset } = usePopulateFromOffset();
   const { erc20Approve } = useErc20Approve();
 
-  // Get user's free balance for missing provision calculation
   const { balanceWei: userFreeBalance } = useGetMakerFreeBalance(userAddress);
 
-  // Get local configs using the new hook
   const {
     ask,
     bid,
@@ -262,7 +255,6 @@ export function useKandelForm(props: KandelFormProps) {
     tickSpacing,
   });
 
-  // Get provision using the new hook - only when gasreq is valid
   const gasreqNumber = useMemo(() => {
     if (gasreqError || !gasreq.trim()) return undefined;
     const parsed = parseInt(gasreq);
@@ -277,7 +269,6 @@ export function useKandelForm(props: KandelFormProps) {
       gasreq: gasreqNumber,
     });
 
-  // Get current order book for the Kandel (only in edit mode to check for live offers)
   const { asks, bids } = useGetOrderBook({
     base: baseTokenInfo?.address,
     quote: quoteTokenInfo?.address,
@@ -287,96 +278,80 @@ export function useKandelForm(props: KandelFormProps) {
     maker: kandelAddress,
   });
 
-  // Helper function to filter numeric input for price fields
+  /**
+   * Validates and sanitizes price input to allow only numeric values with single decimal point.
+   * Prevents multiple decimal points and tracks field modification state for edit mode.
+   */
   const handlePriceChange = (
     value: string,
     setter: (val: string) => void,
     touchSetter?: (val: boolean) => void
   ) => {
-    // Allow only digits, one decimal point, and no leading/trailing spaces
     const numericValue = value.replace(/[^0-9.]/g, '');
 
-    // Prevent multiple decimal points
     const parts = numericValue.split('.');
     if (parts.length > 2) {
-      return; // Don't update if multiple decimals attempted
+      return;
     }
 
     setter(numericValue);
 
-    // Mark field as touched if in edit mode
     if (touchSetter && isEditing) {
       touchSetter(true);
     }
   };
 
-  // Real-time levels per side validation - runs first to establish valid base
   useEffect(() => {
-    // Clear previous error
     setLevelsPerSideError(null);
 
-    // Skip if value is empty
     if (!levelsPerSide.trim()) return;
 
     const levelsInt = parseInt(levelsPerSide);
 
-    // Check if it's a valid number
     if (isNaN(levelsInt)) {
       setLevelsPerSideError(VALIDATION_ERRORS.LEVELS_MUST_BE_NUMBER);
       return;
     }
 
-    // Validate using the validation function
     const validation = validateLevelsPerSide(levelsInt);
     if (validation) {
       setLevelsPerSideError(validation);
     }
   }, [levelsPerSide]);
 
-  // Real-time stepSize validation - only runs when levels per side is valid
   useEffect(() => {
-    // Clear previous error
     setStepSizeError(null);
 
-    // Skip if values are empty
     if (!step.trim() || !levelsPerSide.trim()) return;
 
     const stepSizeInt = parseInt(step);
     const levelsInt = parseInt(levelsPerSide);
 
-    // Only validate stepSize if levels per side is valid first
     if (isNaN(levelsInt) || levelsInt <= 0) {
-      // If levels is invalid, clear stepSize error and let levels validation show first
       return;
     }
 
     const pricePoints = levelsInt * 2;
 
-    // Validate stepSize immediately
     const stepSizeValidation = validateStepSize(stepSizeInt, pricePoints);
     if (stepSizeValidation) {
       setStepSizeError(stepSizeValidation);
     }
   }, [step, levelsPerSide]);
 
-  // Real-time gasreq validation
   useEffect(() => {
     const validationError = validateGasreq(gasreq);
     setGasreqError(validationError);
   }, [gasreq]);
 
-  // Real-time price range validation - runs immediately when min/max prices change
   useEffect(() => {
-    // Clear previous error
     setPriceRangeError(null);
 
-    // Skip if either value is empty
     if (!minPrice.trim() || !maxPrice.trim()) return;
 
     const minP = parseFloat(minPrice);
     const maxP = parseFloat(maxPrice);
 
-    // Check if both are valid numbers
     if (!isFinite(minP)) {
       setPriceRangeError(VALIDATION_ERRORS.MIN_PRICE_INVALID);
       return;
@@ -386,58 +361,48 @@ export function useKandelForm(props: KandelFormProps) {
       return;
     }
 
-    // Check if min price is positive
     if (minP <= 0) {
       setPriceRangeError(VALIDATION_ERRORS.MIN_PRICE_POSITIVE);
       return;
     }
 
-    // Check if max price is greater than min price
     if (maxP <= minP) {
       setPriceRangeError(VALIDATION_ERRORS.MAX_PRICE_GREATER);
       return;
     }
   }, [minPrice, maxPrice]);
 
-  // Real-time minVolume validation - runs immediately when amounts/levels change
   useEffect(() => {
-    // Clear previous error
     setMinVolumeError(null);
 
-    // Skip if required values are empty or missing
     if (!baseAmount.trim() || !quoteAmount.trim() || !levelsPerSide.trim())
       return;
     if (configLoading || !ask.density || !bid.density) return;
 
-    // Skip if gasreq has validation errors
     if (gasreqError) return;
 
     if (!baseTokenInfo || !quoteTokenInfo) return;
 
     try {
-      // Parse amounts and calculate per-level amounts
       const baseAmountWei = parseAmount(baseAmount, baseTokenInfo.decimals);
       const quoteAmountWei = parseAmount(quoteAmount, quoteTokenInfo.decimals);
       const levelsInt = parseInt(levelsPerSide);
       const gasreqBigInt = BigInt(gasreq);
 
-      // Calculate minimum required gives for each direction
       const minRequiredGivesAsk = minGivesUnits(
         ask.density,
         ask.offerGasbase,
         gasreqBigInt
-      ); // base->quote (asks)
+      );
       const minRequiredGivesBid = minGivesUnits(
         bid.density,
         bid.offerGasbase,
         gasreqBigInt
-      ); // quote->base (bids)
+      );
 
-      // Calculate per-level amounts
       const perLevelBase = baseAmountWei / BigInt(levelsInt);
       const perLevelQuote = quoteAmountWei / BigInt(levelsInt);
 
-      // Validate base amount per level (for asks: base->quote)
       if (perLevelBase < minRequiredGivesAsk) {
         setMinVolumeError(
           VALIDATION_ERRORS.BASE_BELOW_MINIMUM(
@@ -449,7 +414,6 @@ export function useKandelForm(props: KandelFormProps) {
         return;
       }
 
-      // Validate quote amount per level (for bids: quote->base)
       if (perLevelQuote < minRequiredGivesBid) {
         setMinVolumeError(
           VALIDATION_ERRORS.QUOTE_BELOW_MINIMUM(
@@ -460,9 +424,7 @@ export function useKandelForm(props: KandelFormProps) {
         );
         return;
       }
-    } catch (error) {
-      // Silently handle parsing errors - user is still typing
-    }
+    } catch (error) {}
   }, [
     baseAmount,
     quoteAmount,
@@ -475,7 +437,6 @@ export function useKandelForm(props: KandelFormProps) {
     configLoading,
   ]);
 
-  // Calculate provision with new hook data
   const [provision, setProvision] = useState({
     perOffer: BigInt(0),
     total: BigInt(0),
@@ -485,7 +446,6 @@ export function useKandelForm(props: KandelFormProps) {
   // Calculate provision per side (asks and bids) - debounced to avoid excessive calls
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
-      // Skip if gasreq has validation errors
       if (gasreqError) {
         setProvision({
           perOffer: BigInt(0),
@@ -553,10 +513,8 @@ export function useKandelForm(props: KandelFormProps) {
           return;
         }
 
-        // Parse levelsPerSide for calculations
         const levelsInt = parseInt(levelsPerSide);
 
-        // Safety check: ensure levels is not zero before any calculations
         if (levelsInt <= 0) {
           setProvision({
             perOffer: BigInt(0),
@@ -570,7 +528,6 @@ export function useKandelForm(props: KandelFormProps) {
           return;
         }
 
-        // Parse form values and create distribution parameters
         const minP = parseFloat(minPrice);
         const maxP = parseFloat(maxPrice);
         const baseAmountWei = parseAmount(baseAmount, baseTokenInfo.decimals);
@@ -605,7 +562,6 @@ export function useKandelForm(props: KandelFormProps) {
         const minTick = minPriceToTick(minP);
         const maxTick = maxPriceToTick(maxP);
 
-        // Bounds checking for tick values to prevent overflow
         const rangeValidationError = validatePriceRange(minTick, maxTick);
         if (rangeValidationError) {
           throw new Error(rangeValidationError);
@@ -616,7 +572,6 @@ export function useKandelForm(props: KandelFormProps) {
           Math.floor(totalTickRange / (levelsInt * 2 - 1))
         );
 
-        // Create market parameters
         const marketParams = {
           base: {
             address: base,
@@ -637,16 +592,13 @@ export function useKandelForm(props: KandelFormProps) {
           tickSpacing,
         };
 
-        // Determine amounts for distribution - use Kandel inventory if user amounts are zero
         let bidGivesForProvision: bigint;
         let askGivesForProvision: bigint;
 
         if (canUseUserAmounts) {
-          // Use user input amounts
           bidGivesForProvision = quoteAmountWei / BigInt(levelsInt);
           askGivesForProvision = baseAmountWei / BigInt(levelsInt);
         } else {
-          // Use Kandel inventory (when editing with addInventory=false)
           bidGivesForProvision =
             kandelReserves!.quoteQty > BigInt(0)
               ? kandelReserves!.quoteQty / BigInt(levelsInt)
@@ -657,7 +609,6 @@ export function useKandelForm(props: KandelFormProps) {
               : BigInt(1);
         }
 
-        // Calculate accurate ask/bid counts using geometric distribution
         const { askCount, bidCount } = getGeometricDistributionOffersCounts({
           baseQuoteTickIndex0: BigInt(minTick),
           baseQuoteTickOffset: tickOffsetBetweenLevels,
@@ -669,11 +620,9 @@ export function useKandelForm(props: KandelFormProps) {
           askGives: askGivesForProvision,
         });
 
-        // Use provision data from hook
         const perAsk = provisionData.perAsk || BigInt(0);
         const perBid = provisionData.perBid || BigInt(0);
 
-        // Use ACTUAL counts for provision calculation
         const askCnt = BigInt(askCount);
         const bidCnt = BigInt(bidCount);
         const actualTotalNeeded = perAsk * askCnt + perBid * bidCnt;
@@ -688,7 +637,6 @@ export function useKandelForm(props: KandelFormProps) {
           ),
         });
       } catch (error) {
-        // Set to 0 on any error - no fallback estimates
         setProvision({
           perOffer: BigInt(0),
           total: BigInt(0),
@@ -724,19 +672,15 @@ export function useKandelForm(props: KandelFormProps) {
     userFreeBalance,
   ]);
 
-  // Computed values
   const canUseUserAmounts = useMemo(() => {
     const amountRequired = !isEditing || addInventory || forceAddInventory;
     return amountRequired && baseAmount.trim() && quoteAmount.trim();
   }, [isEditing, addInventory, forceAddInventory, baseAmount, quoteAmount]);
 
-  // Form validation function
   const validateForm = (): string | null => {
-    // Final loading state checks - ensure everything is still loaded
     if (tokensLoading || !baseTokenInfo || !quoteTokenInfo) {
       return VALIDATION_ERRORS.LOADING_TOKENS;
     }
-    // Check if any real-time validation errors exist
     if (priceRangeError) {
       return priceRangeError;
     }
@@ -753,12 +697,10 @@ export function useKandelForm(props: KandelFormProps) {
       return gasreqError;
     }
 
-    // Check if required fields are empty (basic completeness)
     if (!minPrice.trim() || !maxPrice.trim() || !levelsPerSide.trim()) {
       return VALIDATION_ERRORS.REQUIRED_FIELDS;
     }
 
-    // Amount validation - only required when not in edit mode OR when addInventory is checked OR when no reserves exist
     const amountRequired = !isEditing || addInventory || forceAddInventory;
     if (amountRequired && (!baseAmount.trim() || !quoteAmount.trim())) {
       return VALIDATION_ERRORS.REQUIRED_AMOUNTS(
@@ -770,7 +712,6 @@ export function useKandelForm(props: KandelFormProps) {
     return null;
   };
 
-  // Complete handleSubmit implementation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -786,28 +727,23 @@ export function useKandelForm(props: KandelFormProps) {
     try {
       let address = kandelAddress;
 
-      // Ensure we have proper token info and addresses before proceeding
       if (!baseTokenInfo || !quoteTokenInfo || !base || !quote) {
         throw new Error(VALIDATION_ERRORS.TOKEN_DATA_LOADING);
       }
 
       if (!address) {
-        // Create new Kandel
         address = await create({
           base,
           quote,
           tickSpacing,
         });
       } else if (isEditing && kandelInfo) {
-        // Only retract if there are live offers to retract
         const contractPricePoints = kandelInfo.levelsPerSide * 2;
 
-        // Check if we have live offers
         const hasLiveOffers =
           (asks && asks.length > 0) || (bids && bids.length > 0);
 
         if (hasLiveOffers) {
-          // Retract all existing offers using the contract's current levelsPerSide
           await retractAll({
             kandelAddr: address!,
             pricePoints: contractPricePoints,
@@ -819,27 +755,21 @@ export function useKandelForm(props: KandelFormProps) {
       const baseTokenDec = baseTokenInfo.decimals;
       const quoteTokenDec = quoteTokenInfo.decimals;
 
-      // Parse user input amounts to proper wei/units
-      // In edit mode with addInventory=false, use Kandel inventory if available
       let baseAmountWei = BigInt(0);
       let quoteAmountWei = BigInt(0);
 
       if (!isEditing) {
-        // Create mode: Use user input amounts
         baseAmountWei = parseAmount(baseAmount, baseTokenInfo.decimals);
         quoteAmountWei = parseAmount(quoteAmount, quoteTokenInfo.decimals);
 
-        // Add missing approvals in create mode
         await erc20Approve(base, address!, baseAmountWei);
         await erc20Approve(quote, address!, quoteAmountWei);
       } else if (addInventory) {
-        // Edit mode with addInventory=true: Add user amounts to existing inventory
         const userBaseWei = parseAmount(baseAmount, baseTokenDec);
         const userQuoteWei = parseAmount(quoteAmount, quoteTokenDec);
         baseAmountWei = (kandelReserves?.baseQty || BigInt(0)) + userBaseWei;
         quoteAmountWei = (kandelReserves?.quoteQty || BigInt(0)) + userQuoteWei;
 
-        // Approve tokens only for the user's additional amounts (not the total)
         await erc20Approve(base, address!, userBaseWei);
         await erc20Approve(quote, address!, userQuoteWei);
       } else if (
@@ -849,12 +779,9 @@ export function useKandelForm(props: KandelFormProps) {
         (kandelReserves.baseQty > BigInt(0) ||
           kandelReserves.quoteQty > BigInt(0))
       ) {
-        // Use Kandel inventory amounts (editing without adding inventory, when reserves exist)
         baseAmountWei = kandelReserves.baseQty;
         quoteAmountWei = kandelReserves.quoteQty;
-        // Note: No token approval needed since inventory is already in the contract
       } else {
-        // If editing empty Kandel with user amounts, we need approvals for those amounts
         if (
           isEditing &&
           baseAmount &&
@@ -874,26 +801,21 @@ export function useKandelForm(props: KandelFormProps) {
         }
       }
 
-      // Separate amounts for contract call vs distribution creation
       let baseAmountForContract = BigInt(0);
       let quoteAmountForContract = BigInt(0);
 
       if (!isEditing) {
-        // Create mode - use parsed user amounts
         baseAmountForContract = baseAmountWei;
         quoteAmountForContract = quoteAmountWei;
       } else if (addInventory) {
-        // Edit mode with addInventory=true - send only user amounts to contract
         baseAmountForContract = parseAmount(baseAmount, baseTokenDec);
         quoteAmountForContract = parseAmount(quoteAmount, quoteTokenDec);
       } else {
-        // Edit mode without adding inventory - use 0 amounts, unless Kandel is empty
         if (
           kandelReserves &&
           kandelReserves.baseQty === BigInt(0) &&
           kandelReserves.quoteQty === BigInt(0)
         ) {
-          // Empty Kandel - use user amounts as contract amounts
           baseAmountForContract = baseAmount
             ? parseAmount(baseAmount, baseTokenDec)
             : BigInt(0);
@@ -901,29 +823,24 @@ export function useKandelForm(props: KandelFormProps) {
             ? parseAmount(quoteAmount, quoteTokenDec)
             : BigInt(0);
         } else {
-          // Kandel has existing inventory - use 0 amounts
           baseAmountForContract = BigInt(0);
           quoteAmountForContract = BigInt(0);
         }
       }
 
-      // Calculate parameters for distribution
       const minP = parseFloat(minPrice);
       const maxP = parseFloat(maxPrice);
       const levels = parseInt(levelsPerSide);
       const pricePoints = levels * 2;
 
-      // Get gasreq as BigInt for provision calculations
       const gasreqBigInt = BigInt(gasreq);
 
-      // Always calculate parameters for populateFromOffset
       let minTick: bigint;
       let maxTick: bigint;
       let tickOffsetBetweenLevels: bigint;
       let bidGivesPerLevel: bigint;
       let askGivesPerLevel: bigint;
 
-      // Calculate ticks - use exact contract values when available and prices untouched
       if (
         isEditing &&
         !minPriceTouched &&
@@ -931,12 +848,10 @@ export function useKandelForm(props: KandelFormProps) {
         initialValues.current.baseQuoteTickOffset !== null &&
         initialValues.current.baseQuoteTickIndex0 !== null
       ) {
-        // Use exact contract values when prices untouched
         const levelsCount = BigInt(levels);
         const baseOffset = initialValues.current.baseQuoteTickOffset;
         const baseIndex0 = initialValues.current.baseQuoteTickIndex0;
 
-        // Calculate min/max ticks using the exact formula
         minTick = baseIndex0 - levelsCount * baseOffset;
         maxTick = baseIndex0 + (levelsCount - BigInt(1)) * baseOffset;
         tickOffsetBetweenLevels = baseOffset;
@@ -947,25 +862,21 @@ export function useKandelForm(props: KandelFormProps) {
         initialValues.current.minTick !== null &&
         initialValues.current.maxTick !== null
       ) {
-        // Fallback to stored min/max ticks if we don't have baseQuoteTickOffset
         minTick = initialValues.current.minTick;
         maxTick = initialValues.current.maxTick;
         const totalTickRange = maxTick - minTick;
         tickOffsetBetweenLevels = totalTickRange / BigInt(pricePoints - 1);
       } else {
-        // Recalculate from user input (create mode or prices edited)
         minTick = BigInt(minPriceToTick(minP));
         maxTick = BigInt(maxPriceToTick(maxP));
         const totalTickRange = maxTick - minTick;
         tickOffsetBetweenLevels = totalTickRange / BigInt(pricePoints - 1);
       }
 
-      // Guard against zero offset (from PATCH safety measures)
       if (tickOffsetBetweenLevels === BigInt(0)) {
         tickOffsetBetweenLevels = BigInt(1);
       }
 
-      // Calculate per-level amounts
       if (
         isEditing &&
         !addInventory &&
@@ -973,12 +884,9 @@ export function useKandelForm(props: KandelFormProps) {
         (kandelReserves.baseQty > BigInt(0) ||
           kandelReserves.quoteQty > BigInt(0))
       ) {
-        // Safety check: ensure levels is not zero before division
         if (levels <= 0) {
           throw new Error(VALIDATION_ERRORS.LEVELS_POSITIVE);
         }
-        // Use existing Kandel reserves divided by levels
-        // Handle cases where only one token has inventory
         bidGivesPerLevel =
           kandelReserves.quoteQty > BigInt(0)
             ? kandelReserves.quoteQty / BigInt(levels)
@@ -988,7 +896,6 @@ export function useKandelForm(props: KandelFormProps) {
             ? kandelReserves.baseQty / BigInt(levels)
             : BigInt(1);
 
-        // Validate reserves can cover the grid requirements (only check tokens with inventory)
         const totalBaseRequired = askGivesPerLevel * BigInt(levels);
         const totalQuoteRequired = bidGivesPerLevel * BigInt(levels);
 
@@ -1017,13 +924,10 @@ export function useKandelForm(props: KandelFormProps) {
           throw new Error(errorMsg);
         }
       } else {
-        // Safety check: ensure levels is not zero before division
         if (levels <= 0) {
           throw new Error(VALIDATION_ERRORS.LEVELS_POSITIVE);
         }
 
-        // Use combined amounts (for create mode or addInventory=true with total inventory)
-        // For edit mode with empty reserves, parse user inputs for distribution
         let distributionBaseAmount = baseAmountWei;
         let distributionQuoteAmount = quoteAmountWei;
 
@@ -1032,7 +936,6 @@ export function useKandelForm(props: KandelFormProps) {
           baseAmountWei === BigInt(0) &&
           quoteAmountWei === BigInt(0)
         ) {
-          // Empty Kandel being edited - use user input amounts for distribution
           distributionBaseAmount = baseAmount
             ? parseAmount(baseAmount, baseTokenDec)
             : BigInt(0);
@@ -1045,16 +948,10 @@ export function useKandelForm(props: KandelFormProps) {
         askGivesPerLevel = distributionBaseAmount / BigInt(levels);
       }
 
-      // Safety check: ensure we have amounts for the grid
       if (bidGivesPerLevel === BigInt(0) && askGivesPerLevel === BigInt(0)) {
         throw new Error(VALIDATION_ERRORS.ZERO_AMOUNTS);
       }
 
-      // Solidity type validations are now handled by the validation functions
-
-      // All changes use populateFromOffset - works with or without distribution
-
-      // Pass 0 for gasreq if unchanged (tells contract to keep existing value)
       const gasreqForContract =
         isEditing && gasreq === initialValues.current.gasreq
           ? 0
@@ -1062,21 +959,21 @@ export function useKandelForm(props: KandelFormProps) {
 
       await populateFromOffset({
         kandelAddr: address!,
-        from: BigInt(0), // start index
-        to: BigInt(pricePoints), // end index
-        minTick, // baseQuoteTickIndex0
-        tickOffsetBetweenLevels, // _baseQuoteTickOffset
-        firstAskIndex: BigInt(levels), // firstAskIndex
-        bidGivesPerLevel, // bidGives
-        askGivesPerLevel, // askGives
+        from: BigInt(0),
+        to: BigInt(pricePoints),
+        minTick,
+        tickOffsetBetweenLevels,
+        firstAskIndex: BigInt(levels),
+        bidGivesPerLevel,
+        askGivesPerLevel,
         params: {
-          gasprice: 0, // Use market gas price (0 = use default)
-          gasreq: gasreqForContract, // 0 = keep existing, else update
-          stepSize: parseInt(step), // Must be uint32
-          pricePoints: pricePoints, // Must be uint32
+          gasprice: 0,
+          gasreq: gasreqForContract,
+          stepSize: parseInt(step),
+          pricePoints: pricePoints,
         },
-        baseAmount: baseAmountForContract, // baseAmount to add to inventory
-        quoteAmount: quoteAmountForContract, // quoteAmount to add to inventory
+        baseAmount: baseAmountForContract,
+        quoteAmount: quoteAmountForContract,
         provisionValue: provision.missing,
       });
 
@@ -1089,7 +986,6 @@ export function useKandelForm(props: KandelFormProps) {
       if (err instanceof Error) {
         const message = err.message.toLowerCase();
 
-        // Check for common error patterns and provide better messages
         if (
           ERROR_PATTERNS.INSUFFICIENT.some((pattern) =>
             message.includes(pattern)
@@ -1121,7 +1017,6 @@ export function useKandelForm(props: KandelFormProps) {
     }
   };
 
-  // Memoize form state - only recreate when form values change
   const formState = useMemo(
     () => ({
       minPrice,
@@ -1149,7 +1044,6 @@ export function useKandelForm(props: KandelFormProps) {
     ]
   );
 
-  // Memoize actions - most setters are stable, but it is more readable this way
   const actions = useMemo(
     () => ({
       setMinPrice,
@@ -1169,7 +1063,6 @@ export function useKandelForm(props: KandelFormProps) {
     [handlePriceChange, handleSubmit]
   );
 
-  // Memoize computed values - only recreate when computed values actually change
   const computed = useMemo(
     () => ({
       hasValidTokens,
@@ -1205,7 +1098,6 @@ export function useKandelForm(props: KandelFormProps) {
     ]
   );
 
-  // Memoize status - only recreate when status values change
   const status = useMemo(
     () => ({
       loading,

@@ -31,7 +31,6 @@ export function useWithdrawEth() {
     });
     let txHash: Address | undefined;
     try {
-      // If no amount specified, get the current balance
       const balance =
         amount ||
         ((await readContract(config, {
@@ -45,7 +44,6 @@ export function useWithdrawEth() {
         throw new Error('No ETH balance to withdraw');
       }
 
-      // Use Kandel's withdrawFromMangrove function
       txHash = await writeContractAsync({
         address: kandelAddr,
         abi: KandelABI,

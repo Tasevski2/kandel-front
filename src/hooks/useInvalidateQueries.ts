@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 
 // simple hook for invalidating stale data from cache
+// not production ready, but useful for dev
 export function useInvalidateQueries() {
   const qc = useQueryClient();
 

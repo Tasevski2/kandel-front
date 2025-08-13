@@ -11,12 +11,10 @@ type KandelFormProps = {
   onSuccess?: (address: Address) => void;
 } & (
   | {
-      // Edit mode
       isEditing: true;
       kandelInfo: KandelInfo;
     }
   | {
-      // Create mode
       isEditing?: false;
       market: Market;
     }
@@ -33,7 +31,6 @@ export function KandelForm(props: KandelFormProps) {
     );
   }
 
-  // Show loading state while configuration is loading
   if (status.configLoading && computed.hasValidTokens) {
     return (
       <div className='flex items-center justify-center py-8'>

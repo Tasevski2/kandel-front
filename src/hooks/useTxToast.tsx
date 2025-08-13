@@ -1,16 +1,17 @@
 import { useCallback } from 'react';
 import { toast, type Id } from 'react-toastify/unstyled';
+import { TOAST_AUTO_CLOSE_TIME, DEFAULT_EXPLORER_URL } from '@/lib/constants';
 
 type TxAction = 'signing' | 'submitted' | 'success' | 'failed';
 
 type SetTxToastOpts = {
-  id?: Id; // reuse to update same toast
+  id?: Id;
   hash?: `0x${string}`;
   message?: string;
 };
 
 const EXPLORER_BASE_URL =
-  process.env.NEXT_PUBLIC_EXPLORER_URL || 'http://localhost:3000';
+  process.env.NEXT_PUBLIC_EXPLORER_URL || DEFAULT_EXPLORER_URL;
 
 function txUrl(hash?: `0x${string}`) {
   return hash ? `${EXPLORER_BASE_URL}/tx/${hash}` : undefined;
@@ -68,7 +69,7 @@ export function useTxToast() {
             ),
             isLoading: false,
             type: 'success',
-            autoClose: 3000,
+            autoClose: TOAST_AUTO_CLOSE_TIME,
           });
           return tId;
         }
@@ -83,7 +84,7 @@ export function useTxToast() {
             ),
             isLoading: false,
             type: 'error',
-            autoClose: 3000,
+            autoClose: TOAST_AUTO_CLOSE_TIME,
           });
           return tId;
         }

@@ -35,7 +35,7 @@ export function useRetractAll() {
         address: kandelAddr,
         abi: KandelABI,
         functionName: 'retractOffers',
-        args: [BigInt(0), BigInt(pricePoints)], // Retract from index 0 to all price points
+        args: [BigInt(0), BigInt(pricePoints)],
       });
       setTxToast('submitted', {
         message: 'Retraction submitted. Waiting for confirmation…',

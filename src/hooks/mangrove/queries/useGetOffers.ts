@@ -32,8 +32,8 @@ type OLKey = {
 interface GetOffersParams {
   base?: Address;
   quote?: Address;
-  baseDec?: number; // BASE token decimals
-  quoteDec?: number; // QUOTE token decimals
+  baseDec?: number;
+  quoteDec?: number;
   tickSpacing?: bigint;
   side: OfferSide;
   maker?: Address | null; // if we do not want to filter by maker then we pass null, because at initialization the maker can be undefined

@@ -23,7 +23,6 @@ export function useKandels() {
         const stored = localStorage.getItem('myKandels');
         if (stored) {
           const parsedKandels = JSON.parse(stored);
-          // simple check if the parsed kandels are of type array
           if (Array.isArray(parsedKandels)) {
             setKandels(parsedKandels);
           } else {
@@ -40,7 +39,6 @@ export function useKandels() {
     loadKandels();
   }, []);
 
-  // Save kandels to localStorage
   const saveKandels = useCallback((newKandels: StoredKandel[]) => {
     try {
       localStorage.setItem('myKandels', JSON.stringify(newKandels));
@@ -50,7 +48,6 @@ export function useKandels() {
     }
   }, []);
 
-  // Add a new kandel
   const addKandel = useCallback(
     (kandel: Omit<StoredKandel, 'createdAt'>) => {
       const newKandel: StoredKandel = {
@@ -63,19 +60,16 @@ export function useKandels() {
       );
 
       if (existingIndex >= 0) {
-        // Update existing kandel
         const updatedKandels = [...kandels];
         updatedKandels[existingIndex] = newKandel;
         saveKandels(updatedKandels);
       } else {
-        // Add new kandel
         saveKandels([...kandels, newKandel]);
       }
     },
     [kandels, saveKandels]
   );
 
-  // Remove a kandel
   const removeKandel = useCallback(
     (address: string) => {
       const filteredKandels = kandels.filter(
