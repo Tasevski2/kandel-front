@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TokenPairDisplay } from './TokenDisplay';
 import { useGetKandelsOfferedVolumes } from '@/hooks/kandel/queries/useGetKandelsOfferedVolumes';
 import { KandelVolumeIndicator } from './KandelVolumeIndicator';
-import { useTokensInfo } from '../hooks/token/useTokenInfo';
+import { useTokensInfo } from '../hooks/token/useTokensInfo';
 import type { StoredKandel } from '../hooks/kandel/useKandels';
 import { KANDEL_LABELS } from '../lib/ui-constants';
 import { Address } from 'viem';

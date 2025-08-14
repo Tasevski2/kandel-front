@@ -2,7 +2,7 @@ import {
   getNetworkMajorBaseAssets,
   getNetworkStableCoins,
 } from '@/config/networks';
-import type { TokenInfo } from '@/hooks/token/useTokenInfo';
+import type { TokenInfo } from '@/hooks/token/useTokensInfo';
 import type { Address } from 'viem';
 
 /**

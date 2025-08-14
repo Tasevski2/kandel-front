@@ -508,7 +508,7 @@ export default function KandelDetailPage({ params }: PageProps) {
                       >
                         {isShuttingDown
                           ? 'Shutting down...'
-                          : 'Complete Shutdown & Withdraw All'}
+                          : 'Retract All Offers & Withdraw All Funds'}
                       </button>
                     </div>
                   </div>

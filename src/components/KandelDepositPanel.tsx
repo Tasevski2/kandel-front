@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { TokenDisplay } from './TokenDisplay';
 import { parseAmount } from '../lib/pricing';
-import { TokenInfo } from '../hooks/token/useTokenInfo';
+import { TokenInfo } from '../hooks/token/useTokensInfo';
 import type { Address } from 'viem';
 import { useDepositFunds } from '@/hooks/kandel/mutations/useDepositFunds';
 import { useFundMaker } from '@/hooks/mangrove/mutations/useFundMaker';

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Address } from 'viem';
-import { useTokensInfo, type TokenInfo } from '@/hooks/token/useTokenInfo';
+import { useTokensInfo, type TokenInfo } from '@/hooks/token/useTokensInfo';
 import { tickToPrice } from '@/lib/pricing';
 import { useGetKandelParams } from './useGetKandelParams';
 import { useGetKandelStaticParams } from './useGetKandelStaticParams';

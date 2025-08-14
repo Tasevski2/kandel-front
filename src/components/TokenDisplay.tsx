@@ -1,4 +1,4 @@
-import { type TokenInfo } from '../hooks/token/useTokenInfo';
+import { type TokenInfo } from '../hooks/token/useTokensInfo';
 import { formatAddress } from '@/lib/formatting';
 
 interface TokenDisplayProps {

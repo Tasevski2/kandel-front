@@ -1,5 +1,5 @@
 import { formatTokenAmount } from '../lib/formatting';
-import { TokenInfo } from '../hooks/token/useTokenInfo';
+import { TokenInfo } from '../hooks/token/useTokensInfo';
 
 interface InventoryCardProps {
   baseQty: bigint;

@@ -5,7 +5,7 @@ import { useReadContract } from 'wagmi';
 import { Address } from 'viem';
 import { readerAbi } from '@/abi/reader';
 import { ADDRESSES } from '@/lib/addresses';
-import { useTokensInfo, type TokenInfo } from '@/hooks/token/useTokenInfo';
+import { useTokensInfo, type TokenInfo } from '@/hooks/token/useTokensInfo';
 import determineBaseQuoteDirection from '@/lib/determineBaseQuoteDirection';
 
 export interface Market {

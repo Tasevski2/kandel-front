@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { formatAmount } from '../lib/formatting';
-import { useTokensInfo } from '../hooks/token/useTokenInfo';
+import { useTokensInfo } from '../hooks/token/useTokensInfo';
 import type { Address } from 'viem';
 import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
 import type { Offer } from '@/hooks/mangrove/queries/useGetOffers';
@@ -24,12 +24,19 @@ export function OrderBook({
     () => (base && quote ? [base, quote] : []),
     [base, quote]
   );
-  const { tokensInfo, isLoading: tokensLoading } = useTokensInfo(tokenAddresses);
+  const { tokensInfo, isLoading: tokensLoading } =
+    useTokensInfo(tokenAddresses);
 
   const baseTokenInfo = tokensInfo ? tokensInfo[base!] : undefined;
   const quoteTokenInfo = tokensInfo ? tokensInfo[quote!] : undefined;
 
-  const { asks, bids, isLoading: orderbookLoading, isRefetching, refetch } = useGetOrderBook({
+  const {
+    asks,
+    bids,
+    isLoading: orderbookLoading,
+    isRefetching,
+    refetch,
+  } = useGetOrderBook({
     base: baseTokenInfo?.address,
     quote: quoteTokenInfo?.address,
     baseDec: baseTokenInfo?.decimals,
@@ -157,9 +164,7 @@ function OrdersTableHeader() {
         <th className='px-3 py-2 text-right text-slate-400 font-medium'>
           Maker
         </th>
-        <th className='px-3 py-2 text-right text-slate-400 font-medium'>
-          ID
-        </th>
+        <th className='px-3 py-2 text-right text-slate-400 font-medium'>ID</th>
       </tr>
     </thead>
   );

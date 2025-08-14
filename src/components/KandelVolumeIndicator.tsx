@@ -3,7 +3,7 @@
 import { formatUnits } from 'viem';
 import { formatAmount } from '../lib/formatting';
 import type { KandelOfferedVolume } from '@/hooks/kandel/queries/useGetKandelsOfferedVolumes';
-import type { TokenInfo } from '../hooks/token/useTokenInfo';
+import type { TokenInfo } from '../hooks/token/useTokensInfo';
 
 interface KandelVolumeIndicatorProps {
   kandelAddress: string;

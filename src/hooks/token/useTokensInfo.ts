@@ -10,49 +10,6 @@ export interface TokenInfo {
   address: Address;
 }
 
-export function useTokenInfo(tokenAddress?: Address) {
-  const enabled = Boolean(tokenAddress);
-
-  const { data, isLoading, error, refetch } = useReadContracts({
-    contracts: !enabled
-      ? []
-      : [
-          { address: tokenAddress, abi: erc20Abi, functionName: 'symbol' },
-          { address: tokenAddress, abi: erc20Abi, functionName: 'name' },
-          { address: tokenAddress, abi: erc20Abi, functionName: 'decimals' },
-        ],
-    allowFailure: false,
-    query: {
-      enabled,
-    },
-  });
-
-  const tokenInfo: TokenInfo | null = useMemo(() => {
-    if (!enabled) return null;
-    if (!data) return null;
-
-    const [sym, nm, dec] = data;
-
-    if (sym !== undefined && nm !== undefined && dec !== undefined) {
-      return {
-        symbol: sym,
-        name: nm,
-        decimals: Number(dec),
-        address: tokenAddress!,
-      };
-    }
-
-    return null;
-  }, [enabled, data, tokenAddress]);
-
-  return {
-    tokenInfo,
-    isLoading,
-    error: error ? 'Failed to fetch token info' : null,
-    refetch,
-  };
-}
-
 export function useTokensInfo(addresses: Address[]) {
   const enabled = addresses.length > 0;
 
