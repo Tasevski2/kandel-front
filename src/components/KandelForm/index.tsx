@@ -229,6 +229,22 @@ export function KandelForm(props: KandelFormProps) {
                 {computed.baseTokenInfo.symbol}
               </div>
             )}
+            {computed.baseTokenInfo && computed.balances && (
+              <div className='text-xs text-slate-500 mt-1'>
+                Your Balance:{' '}
+                {formatTokenAmount(
+                  computed.balances[computed.baseTokenInfo.address] ||
+                    BigInt(0),
+                  computed.baseTokenInfo.decimals
+                )}{' '}
+                {computed.baseTokenInfo.symbol}
+              </div>
+            )}
+            {status.baseBalanceError && (
+              <p className='text-red-400 text-sm mt-1'>
+                {status.baseBalanceError}
+              </p>
+            )}
           </div>
 
           <div>
@@ -269,6 +285,22 @@ export function KandelForm(props: KandelFormProps) {
                 )}{' '}
                 {computed.quoteTokenInfo.symbol}
               </div>
+            )}
+            {computed.quoteTokenInfo && computed.balances && (
+              <div className='text-xs text-slate-500 mt-1'>
+                Your Balance:{' '}
+                {formatTokenAmount(
+                  computed.balances[computed.quoteTokenInfo.address] ||
+                    BigInt(0),
+                  computed.quoteTokenInfo.decimals
+                )}{' '}
+                {computed.quoteTokenInfo.symbol}
+              </div>
+            )}
+            {status.quoteBalanceError && (
+              <p className='text-red-400 text-sm mt-1'>
+                {status.quoteBalanceError}
+              </p>
             )}
           </div>
         </div>
@@ -329,7 +361,9 @@ export function KandelForm(props: KandelFormProps) {
           status.stepSizeError !== null ||
           status.minVolumeError !== null ||
           status.priceRangeError !== null ||
-          status.gasreqError !== null
+          status.gasreqError !== null ||
+          status.baseBalanceError !== null ||
+          status.quoteBalanceError !== null
         }
         className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
       >

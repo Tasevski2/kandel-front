@@ -7,7 +7,7 @@ export function TokenBalances() {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({
     address,
-    query: { refetchInterval: 5000 },
+    query: { enabled: !!address, refetchInterval: 5000 },
   });
 
   if (!isConnected || !balance) {

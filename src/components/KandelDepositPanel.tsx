@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { TokenDisplay } from './TokenDisplay';
 import { parseAmount } from '../lib/pricing';
+import { formatTokenAmount } from '../lib/formatting';
 import { TokenInfo } from '../hooks/token/useTokensInfo';
+import { useGetTokensBalances } from '../hooks/token/useGetTokensBalances';
 import type { Address } from 'viem';
 import { useDepositFunds } from '@/hooks/kandel/mutations/useDepositFunds';
 import { useFundMaker } from '@/hooks/mangrove/mutations/useFundMaker';
@@ -27,17 +29,15 @@ export function KandelDepositPanel({
   const [baseDepositAmount, setBaseDepositAmount] = useState('');
   const [quoteDepositAmount, setQuoteDepositAmount] = useState('');
   const [ethDepositAmount, setEthDepositAmount] = useState('');
+  const [baseDepositError, setBaseDepositError] = useState<string | null>(null);
+  const [quoteDepositError, setQuoteDepositError] = useState<string | null>(
+    null
+  );
+  const [ethDepositError, setEthDepositError] = useState<string | null>(null);
 
-  const { data: baseBalance } = useBalance({
-    address: userAddress,
-    token: baseTokenInfo.address as Address,
-    query: { enabled: !!userAddress },
-  });
-
-  const { data: quoteBalance } = useBalance({
-    address: userAddress,
-    token: quoteTokenInfo.address as Address,
-    query: { enabled: !!userAddress },
+  const { balances, isLoading: balancesLoading } = useGetTokensBalances({
+    tokenAddresses: [baseTokenInfo.address, quoteTokenInfo.address],
+    userAddress,
   });
 
   const { data: ethBalance } = useBalance({
@@ -45,58 +45,89 @@ export function KandelDepositPanel({
     query: { enabled: !!userAddress },
   });
 
-  function validateDepositAmount(
-    amountStr: string,
-    balanceData: { value: bigint } | null | undefined,
-    tokenSymbol: string,
-    decimals: number = 18
-  ): string | null {
-    if (!amountStr || amountStr.trim() === '') return null;
+  useEffect(() => {
+    setBaseDepositError(null);
+    if (!baseDepositAmount.trim() || !userAddress) return;
 
-    const amount = parseFloat(amountStr);
+    const amount = parseFloat(baseDepositAmount);
     if (isNaN(amount) || amount <= 0) {
-      return `${tokenSymbol} amount must be greater than 0`;
+      setBaseDepositError(
+        `${baseTokenInfo.symbol} amount must be greater than 0`
+      );
+      return;
     }
 
-    if (!balanceData) {
-      return `Unable to verify ${tokenSymbol} balance`;
+    const inputAmount = parseAmount(baseDepositAmount, baseTokenInfo.decimals);
+    const userBalance = balances[baseTokenInfo.address] || BigInt(0);
+
+    if (inputAmount > userBalance) {
+      const formattedBalance = formatTokenAmount(
+        userBalance,
+        baseTokenInfo.decimals
+      );
+      setBaseDepositError(
+        `Insufficient balance. Available: ${formattedBalance} ${baseTokenInfo.symbol}`
+      );
+    }
+  }, [baseDepositAmount, balances, baseTokenInfo, userAddress]);
+
+  // Validate quote token amount on change
+  useEffect(() => {
+    setQuoteDepositError(null);
+    if (!quoteDepositAmount.trim() || !userAddress) return;
+
+    const amount = parseFloat(quoteDepositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setQuoteDepositError(
+        `${quoteTokenInfo.symbol} amount must be greater than 0`
+      );
+      return;
     }
 
-    const amountWei = parseAmount(amountStr, decimals);
-    if (amountWei > balanceData.value) {
-      return `Insufficient ${tokenSymbol} balance`;
+    const inputAmount = parseAmount(
+      quoteDepositAmount,
+      quoteTokenInfo.decimals
+    );
+    const userBalance = balances[quoteTokenInfo.address] || BigInt(0);
+
+    if (inputAmount > userBalance) {
+      const formattedBalance = formatTokenAmount(
+        userBalance,
+        quoteTokenInfo.decimals
+      );
+      setQuoteDepositError(
+        `Insufficient balance. Available: ${formattedBalance} ${quoteTokenInfo.symbol}`
+      );
+    }
+  }, [quoteDepositAmount, balances, quoteTokenInfo, userAddress]);
+
+  // Validate ETH amount on change
+  useEffect(() => {
+    setEthDepositError(null);
+    if (!ethDepositAmount.trim() || !userAddress) return;
+
+    const amount = parseFloat(ethDepositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setEthDepositError('ETH amount must be greater than 0');
+      return;
     }
 
-    return null;
-  }
+    if (!ethBalance) return;
+
+    const inputAmount = parseAmount(ethDepositAmount, 18);
+    if (inputAmount > ethBalance.value) {
+      const formattedBalance = formatTokenAmount(ethBalance.value, 18);
+      setEthDepositError(
+        `Insufficient balance. Available: ${formattedBalance} ETH`
+      );
+    }
+  }, [ethDepositAmount, ethBalance, userAddress]);
 
   const handleTokenDeposit = async () => {
     if (!userAddress) return;
 
-    if (baseDepositAmount) {
-      const baseError = validateDepositAmount(
-        baseDepositAmount,
-        baseBalance,
-        baseTokenInfo.symbol,
-        baseTokenInfo.decimals
-      );
-      if (baseError) {
-        alert(baseError);
-        return;
-      }
-    }
-
-    if (quoteDepositAmount) {
-      const quoteError = validateDepositAmount(
-        quoteDepositAmount,
-        quoteBalance,
-        quoteTokenInfo.symbol,
-        quoteTokenInfo.decimals
-      );
-      if (quoteError) {
-        alert(quoteError);
-        return;
-      }
+    if (baseDepositError || quoteDepositError) {
+      return;
     }
 
     const baseAmount = baseDepositAmount
@@ -130,14 +161,8 @@ export function KandelDepositPanel({
   const handleEthDeposit = async () => {
     if (!ethDepositAmount || !userAddress) return;
 
-    const ethError = validateDepositAmount(
-      ethDepositAmount,
-      ethBalance,
-      'ETH',
-      18
-    );
-    if (ethError) {
-      alert(ethError);
+    // Check for validation error
+    if (ethDepositError) {
       return;
     }
 
@@ -177,6 +202,19 @@ export function KandelDepositPanel({
               className='input'
               disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
+            {balances && baseTokenInfo && (
+              <div className='text-xs text-slate-500 mt-1'>
+                Your Balance:{' '}
+                {formatTokenAmount(
+                  balances[baseTokenInfo.address] || BigInt(0),
+                  baseTokenInfo.decimals
+                )}{' '}
+                {baseTokenInfo.symbol}
+              </div>
+            )}
+            {baseDepositError && (
+              <p className='text-red-400 text-sm mt-1'>{baseDepositError}</p>
+            )}
           </div>
           <div>
             <label className='label text-sm'>
@@ -190,13 +228,30 @@ export function KandelDepositPanel({
               className='input'
               disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
+            {balances && quoteTokenInfo && (
+              <div className='text-xs text-slate-500 mt-1'>
+                Your Balance:{' '}
+                {formatTokenAmount(
+                  balances[quoteTokenInfo.address] || BigInt(0),
+                  quoteTokenInfo.decimals
+                )}{' '}
+                {quoteTokenInfo.symbol}
+              </div>
+            )}
+            {quoteDepositError && (
+              <p className='text-red-400 text-sm mt-1'>{quoteDepositError}</p>
+            )}
           </div>
         </div>
 
         <button
           onClick={handleTokenDeposit}
           disabled={
-            isLoadingTokenDeposit || (!baseDepositAmount && !quoteDepositAmount)
+            isLoadingTokenDeposit ||
+            (!baseDepositAmount && !quoteDepositAmount) ||
+            !!baseDepositError ||
+            !!quoteDepositError ||
+            balancesLoading
           }
           className='btn-primary w-full disabled:opacity-50'
         >
@@ -214,11 +269,21 @@ export function KandelDepositPanel({
               className='input'
               disabled={isLoadingTokenDeposit || isLoadingEthDeposit}
             />
+            {ethBalance && (
+              <div className='text-xs text-slate-500 mt-1'>
+                Your Balance: {formatTokenAmount(ethBalance.value, 18)} ETH
+              </div>
+            )}
+            {ethDepositError && (
+              <p className='text-red-400 text-sm mt-1'>{ethDepositError}</p>
+            )}
           </div>
 
           <button
             onClick={handleEthDeposit}
-            disabled={isLoadingEthDeposit || !ethDepositAmount}
+            disabled={
+              isLoadingEthDeposit || !ethDepositAmount || !!ethDepositError
+            }
             className='btn-secondary w-full mt-2 disabled:opacity-50'
           >
             {isLoadingEthDeposit ? 'Depositing...' : 'Deposit ETH'}

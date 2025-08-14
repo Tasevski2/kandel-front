@@ -9,6 +9,7 @@ import { TRANSACTION_CONFIRMATIONS, QUERY_SCOPE_KEYS } from '@/lib/constants';
 import { useErc20Approve } from '../../token/useErc20Approve';
 import { useInvalidateQueries } from '@/hooks/useInvalidateQueries';
 import { useTxToast } from '@/hooks/useTxToast';
+import type { Id } from 'react-toastify';
 
 type DepositFundsArgs = {
   kandel: Address;
@@ -35,14 +36,16 @@ export function useDepositFunds() {
     }
 
     setLoading(true);
-    const toastId = setTxToast('signing', {
-      message: 'Signing deposit…',
-    });
+    let toastId: Id | undefined;
     let txHash: Address | undefined;
 
     try {
       await erc20Approve(baseToken, kandel, baseAmount);
       await erc20Approve(quoteToken, kandel, quoteAmount);
+
+      toastId = setTxToast('signing', {
+        message: 'Signing deposit…',
+      });
 
       txHash = await writeContractAsync({
         address: kandel,

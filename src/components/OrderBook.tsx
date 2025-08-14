@@ -196,13 +196,13 @@ function OrderBookRow({
         {formatAmount(offer.price)}
       </td>
       <td className='px-3 py-1 text-right text-slate-300'>
-        <span className='tabular-nums'>{formatAmount(offer.size)}</span>{' '}
+        <span className='tabular-nums'>{formatAmount(offer.size, 6)}</span>{' '}
         <span className='text-slate-500 text-xs'>
           {baseTokenSymbol || '...'}
         </span>
       </td>
       <td className='px-3 py-1 text-right text-slate-400'>
-        <span className='tabular-nums'>{formatAmount(offer.value)}</span>{' '}
+        <span className='tabular-nums'>{formatAmount(offer.value, 6)}</span>{' '}
         <span className='text-slate-600 text-xs'>
           {quoteTokenSymbol || '...'}
         </span>

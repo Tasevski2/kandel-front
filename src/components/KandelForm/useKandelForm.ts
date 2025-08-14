@@ -9,6 +9,7 @@ import { useProvision } from '@/hooks/mangrove/queries/useProvision';
 import { useGetLocalConfigs } from '@/hooks/mangrove/queries/useGetLocalConfigs';
 import { useGetReserveBalances } from '@/hooks/kandel/queries/useGetReserveBalances';
 import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
+import { useGetTokensBalances } from '@/hooks/token/useGetTokensBalances';
 import type { KandelInfo } from '@/hooks/kandel/queries/useGetKandelInfo';
 import {
   DEFAULT_STEP,
@@ -176,6 +177,10 @@ export function useKandelForm(props: KandelFormProps) {
     null
   );
   const [gasreqError, setGasreqError] = useState<string | null>(null);
+  const [baseBalanceError, setBaseBalanceError] = useState<string | null>(null);
+  const [quoteBalanceError, setQuoteBalanceError] = useState<string | null>(
+    null
+  );
 
   const [minPriceTouched, setMinPriceTouched] = useState(false);
   const [maxPriceTouched, setMaxPriceTouched] = useState(false);
@@ -274,6 +279,18 @@ export function useKandelForm(props: KandelFormProps) {
     quoteDec: quoteTokenInfo?.decimals,
     tickSpacing,
     maker: kandelAddress,
+  });
+
+  const tokenAddresses = useMemo(() => {
+    const addresses: Address[] = [];
+    if (baseTokenInfo?.address) addresses.push(baseTokenInfo.address);
+    if (quoteTokenInfo?.address) addresses.push(quoteTokenInfo.address);
+    return addresses;
+  }, [baseTokenInfo?.address, quoteTokenInfo?.address]);
+
+  const { balances } = useGetTokensBalances({
+    tokenAddresses,
+    userAddress,
   });
 
   /**
@@ -433,6 +450,76 @@ export function useKandelForm(props: KandelFormProps) {
     bid,
     gasreq,
     configLoading,
+  ]);
+
+  // Validate base token balance
+  useEffect(() => {
+    setBaseBalanceError(null);
+
+    if (!baseAmount.trim() || !baseTokenInfo || !userAddress) return;
+
+    // Only validate when user is actually depositing
+    if (!isEditing || addInventory || forceAddInventory) {
+      try {
+        const inputAmount = parseAmount(baseAmount, baseTokenInfo.decimals);
+        const userBalance = balances[baseTokenInfo.address] || BigInt(0);
+
+        if (inputAmount > userBalance) {
+          const formattedBalance = formatTokenAmount(
+            userBalance,
+            baseTokenInfo.decimals
+          );
+          setBaseBalanceError(
+            `Insufficient balance. Available: ${formattedBalance} ${baseTokenInfo.symbol}`
+          );
+        }
+      } catch (error) {
+        // Invalid input amount will be handled by other validations
+      }
+    }
+  }, [
+    baseAmount,
+    baseTokenInfo,
+    userAddress,
+    isEditing,
+    addInventory,
+    forceAddInventory,
+    balances,
+  ]);
+
+  // Validate quote token balance
+  useEffect(() => {
+    setQuoteBalanceError(null);
+
+    if (!quoteAmount.trim() || !quoteTokenInfo || !userAddress) return;
+
+    // Only validate when user is actually depositing
+    if (!isEditing || addInventory || forceAddInventory) {
+      try {
+        const inputAmount = parseAmount(quoteAmount, quoteTokenInfo.decimals);
+        const userBalance = balances[quoteTokenInfo.address] || BigInt(0);
+
+        if (inputAmount > userBalance) {
+          const formattedBalance = formatTokenAmount(
+            userBalance,
+            quoteTokenInfo.decimals
+          );
+          setQuoteBalanceError(
+            `Insufficient balance. Available: ${formattedBalance} ${quoteTokenInfo.symbol}`
+          );
+        }
+      } catch (error) {
+        // Invalid input amount will be handled by other validations
+      }
+    }
+  }, [
+    quoteAmount,
+    quoteTokenInfo,
+    userAddress,
+    isEditing,
+    addInventory,
+    forceAddInventory,
+    balances,
   ]);
 
   const [provision, setProvision] = useState({
@@ -1077,6 +1164,7 @@ export function useKandelForm(props: KandelFormProps) {
       canUseUserAmounts,
       provision,
       dirty,
+      balances,
     }),
     [
       baseTokenInfo,
@@ -1092,6 +1180,7 @@ export function useKandelForm(props: KandelFormProps) {
       canUseUserAmounts,
       provision,
       dirty,
+      balances,
     ]
   );
 
@@ -1106,6 +1195,8 @@ export function useKandelForm(props: KandelFormProps) {
       levelsPerSideError,
       stepSizeError,
       gasreqError,
+      baseBalanceError,
+      quoteBalanceError,
     }),
     [
       loading,
@@ -1117,6 +1208,8 @@ export function useKandelForm(props: KandelFormProps) {
       levelsPerSideError,
       stepSizeError,
       gasreqError,
+      baseBalanceError,
+      quoteBalanceError,
     ]
   );
 
