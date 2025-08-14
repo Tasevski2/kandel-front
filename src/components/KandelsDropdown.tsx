@@ -73,12 +73,13 @@ export function KandelsDropdown({
     setSearchTerm('');
   };
 
-  // Show wallet connection prompt if wallet is not connected
   if (!isConnected) {
     return (
       <div className='relative'>
         <div className='input flex items-center justify-between cursor-not-allowed opacity-50'>
-          <span className='text-slate-400'>Connect wallet to view your Kandels</span>
+          <span className='text-slate-400'>
+            Connect wallet to view your Kandels
+          </span>
           <svg
             className='w-4 h-4 text-slate-400'
             fill='none'
