@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { TokenPairDisplay } from './TokenDisplay';
 import { useGetKandelsOfferedVolumes } from '@/hooks/kandel/queries/useGetKandelsOfferedVolumes';
 import { KandelVolumeIndicator } from './KandelVolumeIndicator';
@@ -22,6 +23,7 @@ export function KandelsDropdown({
   placeholder = KANDEL_LABELS.yourKandels,
 }: KandelsDropdownProps) {
   const router = useRouter();
+  const { isConnected } = useAccount();
   const { getOfferedVolume, isLoading: isLoadingOfferedVolumes } =
     useGetKandelsOfferedVolumes(kandels);
 
@@ -70,6 +72,30 @@ export function KandelsDropdown({
     setIsOpen(false);
     setSearchTerm('');
   };
+
+  // Show wallet connection prompt if wallet is not connected
+  if (!isConnected) {
+    return (
+      <div className='relative'>
+        <div className='input flex items-center justify-between cursor-not-allowed opacity-50'>
+          <span className='text-slate-400'>Connect wallet to view your Kandels</span>
+          <svg
+            className='w-4 h-4 text-slate-400'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z'
+            />
+          </svg>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
