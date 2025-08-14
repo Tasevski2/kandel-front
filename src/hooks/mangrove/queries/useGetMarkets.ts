@@ -12,8 +12,6 @@ export interface Market {
   tkn0: Address;
   tkn1: Address;
   tickSpacing: bigint;
-  baseToken: Address;
-  quoteToken: Address;
   baseTokenInfo: TokenInfo;
   quoteTokenInfo: TokenInfo;
   pairId: string;
@@ -105,8 +103,6 @@ export function useGetMarkets() {
           tkn0: market.tkn0,
           tkn1: market.tkn1,
           tickSpacing: market.tickSpacing,
-          baseToken,
-          quoteToken,
           baseTokenInfo,
           quoteTokenInfo,
           pairId,
@@ -151,8 +147,8 @@ export function useGetMarkets() {
         if (market) {
           return {
             market,
-            baseToken: market.baseToken,
-            quoteToken: market.quoteToken,
+            baseToken: market.baseTokenInfo.address,
+            quoteToken: market.quoteTokenInfo.address,
           };
         }
 

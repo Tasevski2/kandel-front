@@ -9,7 +9,6 @@ import { useProvision } from '@/hooks/mangrove/queries/useProvision';
 import { useGetLocalConfigs } from '@/hooks/mangrove/queries/useGetLocalConfigs';
 import { useGetReserveBalances } from '@/hooks/kandel/queries/useGetReserveBalances';
 import { useGetOrderBook } from '@/hooks/mangrove/queries/useGetOrderBook';
-import { useTokensInfo } from '@/hooks/token/useTokenInfo';
 import type { KandelInfo } from '@/hooks/kandel/queries/useGetKandelInfo';
 import {
   DEFAULT_STEP,
@@ -93,14 +92,14 @@ export function useKandelForm(props: KandelFormProps) {
     if (isEditing && kandelInfo) {
       return kandelInfo.base.address;
     }
-    return market?.baseToken;
+    return market?.baseTokenInfo?.address;
   }, [isEditing, kandelInfo, market]);
 
   const quote = useMemo<Address | undefined>(() => {
     if (isEditing && kandelInfo) {
       return kandelInfo.quote.address;
     }
-    return market?.quoteToken;
+    return market?.quoteTokenInfo?.address;
   }, [isEditing, kandelInfo, market]);
 
   const tickSpacing = useMemo<bigint>(() => {
@@ -110,26 +109,25 @@ export function useKandelForm(props: KandelFormProps) {
     return market?.tickSpacing || BigInt(1);
   }, [isEditing, kandelInfo, market]);
 
-  const hasValidTokens = base !== undefined && quote !== undefined;
-  const tokenAddresses = useMemo(
-    () => (hasValidTokens ? [base!, quote!] : []),
-    [base, quote, hasValidTokens]
-  );
-  const { tokensInfo, isLoading: tokensLoading } =
-    useTokensInfo(tokenAddresses);
+  const baseTokenInfo = useMemo(() => {
+    if (isEditing && kandelInfo) {
+      return kandelInfo.base;
+    }
+    if (!isEditing && market) {
+      return market.baseTokenInfo;
+    }
+    return undefined;
+  }, [isEditing, kandelInfo, market]);
 
-  const baseTokenInfo =
-    isEditing && kandelInfo
-      ? kandelInfo.base
-      : tokensInfo && base
-      ? tokensInfo[base]
-      : undefined;
-  const quoteTokenInfo =
-    isEditing && kandelInfo
-      ? kandelInfo.quote
-      : tokensInfo && quote
-      ? tokensInfo[quote]
-      : undefined;
+  const quoteTokenInfo = useMemo(() => {
+    if (isEditing && kandelInfo) {
+      return kandelInfo.quote;
+    }
+    if (!isEditing && market) {
+      return market.quoteTokenInfo;
+    }
+    return undefined;
+  }, [isEditing, kandelInfo, market]);
 
   const [minPrice, setMinPrice] = useState(() => {
     if (isEditing && kandelInfo?.minPrice) {
@@ -678,7 +676,7 @@ export function useKandelForm(props: KandelFormProps) {
   }, [isEditing, addInventory, forceAddInventory, baseAmount, quoteAmount]);
 
   const validateForm = (): string | null => {
-    if (tokensLoading || !baseTokenInfo || !quoteTokenInfo) {
+    if (!baseTokenInfo || !quoteTokenInfo) {
       return VALIDATION_ERRORS.LOADING_TOKENS;
     }
     if (priceRangeError) {
@@ -1065,7 +1063,7 @@ export function useKandelForm(props: KandelFormProps) {
 
   const computed = useMemo(
     () => ({
-      hasValidTokens,
+      hasValidTokens: !!(baseTokenInfo && quoteTokenInfo),
       baseTokenInfo,
       quoteTokenInfo,
       base,
@@ -1081,7 +1079,6 @@ export function useKandelForm(props: KandelFormProps) {
       dirty,
     }),
     [
-      hasValidTokens,
       baseTokenInfo,
       quoteTokenInfo,
       base,
@@ -1101,7 +1098,6 @@ export function useKandelForm(props: KandelFormProps) {
   const status = useMemo(
     () => ({
       loading,
-      tokensLoading,
       configLoading,
       provisionLoading,
       error,
@@ -1113,7 +1109,6 @@ export function useKandelForm(props: KandelFormProps) {
     }),
     [
       loading,
-      tokensLoading,
       configLoading,
       provisionLoading,
       error,

@@ -47,8 +47,8 @@ export function MarketDropdown({
     const searchLower = searchTerm.toLowerCase();
     return (
       market.pairId.toLowerCase().includes(searchLower) ||
-      market.baseToken.toLowerCase().includes(searchLower) ||
-      market.quoteToken.toLowerCase().includes(searchLower)
+      market.baseTokenInfo.address.toLowerCase().includes(searchLower) ||
+      market.quoteTokenInfo.address.toLowerCase().includes(searchLower)
     );
   });
 
@@ -144,11 +144,11 @@ export function MarketDropdown({
             ) : (
               filteredMarkets.map((market) => (
                 <button
-                  key={`${market.baseToken}-${market.quoteToken}-${market.tickSpacing}`}
+                  key={`${market.baseTokenInfo.address}-${market.quoteTokenInfo.address}-${market.tickSpacing}`}
                   onClick={() => handleMarketSelect(market)}
                   className={`w-full px-3 py-2 text-left hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-b-0 ${
-                    selectedMarket?.baseToken === market.baseToken &&
-                    selectedMarket?.quoteToken === market.quoteToken &&
+                    selectedMarket?.baseTokenInfo.address === market.baseTokenInfo.address &&
+                    selectedMarket?.quoteTokenInfo.address === market.quoteTokenInfo.address &&
                     selectedMarket?.tickSpacing === market.tickSpacing
                       ? 'bg-slate-700'
                       : ''

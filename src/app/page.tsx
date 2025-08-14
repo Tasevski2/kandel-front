@@ -117,8 +117,8 @@ export default function HomePage() {
 
             {selectedMarket && (
               <OrderBook
-                base={selectedMarket.baseToken}
-                quote={selectedMarket.quoteToken}
+                base={selectedMarket.baseTokenInfo.address}
+                quote={selectedMarket.quoteTokenInfo.address}
                 tickSpacing={selectedMarket.tickSpacing}
                 highlightMakers={kandels.map((k) => k.address as Address)}
               />

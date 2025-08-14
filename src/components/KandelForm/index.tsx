@@ -23,15 +23,9 @@ type KandelFormProps = {
 export function KandelForm(props: KandelFormProps) {
   const { formState, actions, computed, status } = useKandelForm(props);
 
-  if (!computed.hasValidTokens) {
-    return (
-      <div className='min-h-screen p-8 flex items-center justify-center'>
-        <div className='text-slate-400'>Loading token information...</div>
-      </div>
-    );
-  }
+  const isLoading = !computed.hasValidTokens || status.configLoading;
 
-  if (status.configLoading && computed.hasValidTokens) {
+  if (isLoading) {
     return (
       <div className='flex items-center justify-center py-8'>
         <div className='text-slate-400'>Loading configuration...</div>

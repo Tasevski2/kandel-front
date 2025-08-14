@@ -24,12 +24,12 @@ export function OrderBook({
     () => (base && quote ? [base, quote] : []),
     [base, quote]
   );
-  const { tokensInfo } = useTokensInfo(tokenAddresses);
+  const { tokensInfo, isLoading: tokensLoading } = useTokensInfo(tokenAddresses);
 
   const baseTokenInfo = tokensInfo ? tokensInfo[base!] : undefined;
   const quoteTokenInfo = tokensInfo ? tokensInfo[quote!] : undefined;
 
-  const { asks, bids, isLoading, isRefetching, refetch } = useGetOrderBook({
+  const { asks, bids, isLoading: orderbookLoading, isRefetching, refetch } = useGetOrderBook({
     base: baseTokenInfo?.address,
     quote: quoteTokenInfo?.address,
     baseDec: baseTokenInfo?.decimals,
@@ -37,6 +37,8 @@ export function OrderBook({
     tickSpacing: tickSpacing,
     maker: null,
   });
+
+  const isLoading = tokensLoading || orderbookLoading;
 
   if (isLoading) {
     return (

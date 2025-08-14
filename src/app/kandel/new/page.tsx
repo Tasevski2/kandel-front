@@ -23,8 +23,8 @@ export default function NewKandelPage() {
     if (selectedMarket) {
       addKandel({
         address,
-        baseToken: selectedMarket.baseToken,
-        quoteToken: selectedMarket.quoteToken,
+        baseToken: selectedMarket.baseTokenInfo.address,
+        quoteToken: selectedMarket.quoteTokenInfo.address,
         tickSpacing: selectedMarket.tickSpacing.toString(),
         pairId: selectedMarket.pairId,
       });
